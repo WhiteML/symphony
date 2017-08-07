@@ -4,7 +4,7 @@
     <head>
         <@head title="${chargePointLabel} - ${symphonyLabel}">
         </@head>
-        <link type="text/css" rel="stylesheet" href="${staticServePath}/css/index.css?${staticResourceVersion}" />
+        <link rel="stylesheet" href="${staticServePath}/css/index.css?${staticResourceVersion}" />
         <link rel="canonical" href="${servePath}/charge/point">
     </head>
     <body>
@@ -13,10 +13,14 @@
             <div class="wrapper">
                 <div class="content">
                     <div class="module">
-                        <h2 class="sub-head"><span class="ft-blue">♦</span> ${chargePointLabel}</h2>
-                        <div class="content-reset article-charge-point">
+                        <h2 class="sub-head"><span class="ft-red">♦</span> ${chargePointLabel}</h2>
+                        <div class="content-reset fn-content">
                             ${chargePointContentLabel}
                         </div>
+                        <div class="top-ranking">
+                            <#include "common/ranking.ftl">
+                        </div>
+                        <br/>
                     </div>
                 </div>
                 <div class="side">

@@ -1,6 +1,6 @@
 /*
  * Symphony - A modern community (forum/SNS/blog) platform written in Java.
- * Copyright (C) 2012-2016,  b3log.org & hacpai.com
+ * Copyright (C) 2012-2017,  b3log.org & hacpai.com
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,9 +17,7 @@
  */
 package org.b3log.symphony.service;
 
-import java.util.LinkedList;
-import java.util.List;
-import javax.inject.Inject;
+import org.b3log.latke.ioc.inject.Inject;
 import org.b3log.latke.logging.Level;
 import org.b3log.latke.logging.Logger;
 import org.b3log.latke.repository.RepositoryException;
@@ -30,6 +28,9 @@ import org.b3log.symphony.processor.channel.TimelineChannel;
 import org.b3log.symphony.repository.UserRepository;
 import org.b3log.symphony.util.Symphonys;
 import org.json.JSONObject;
+
+import java.util.LinkedList;
+import java.util.List;
 
 /**
  * Timeline management service.
@@ -44,7 +45,7 @@ public class TimelineMgmtService {
     /**
      * Logger.
      */
-    private static final Logger LOGGER = Logger.getLogger(TimelineMgmtService.class.getName());
+    private static final Logger LOGGER = Logger.getLogger(TimelineMgmtService.class);
 
     /**
      * Timelines.
@@ -61,12 +62,12 @@ public class TimelineMgmtService {
      * Adds the specified timeline.
      *
      * @param timeline the specified timeline, for example,      <pre>
-     * {
-     *     "userId": "",
-     *     "type": "article",
-     *     "content": timelineArticleLabel
-     * }
-     * </pre>
+     *                 {
+     *                     "userId": "",
+     *                     "type": "article",
+     *                     "content": timelineArticleAddLabel
+     *                 }
+     *                 </pre>
      */
     public void addTimeline(final JSONObject timeline) {
         String userId = timeline.optString(Common.USER_ID);

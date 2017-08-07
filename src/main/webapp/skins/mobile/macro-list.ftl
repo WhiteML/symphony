@@ -1,4 +1,5 @@
 <#macro list listData>
+<#include "common/title-icon.ftl">
 <div class="article-list list">
     <ul>
         <#assign articleIds = "">
@@ -13,28 +14,14 @@
                    ></#if><div class="avatar" style="background-image:url('${article.articleAuthorThumbnailURL48}')"></div><#if article.articleAnonymous == 0></a></#if>
                 <div class="fn-flex-1 has-view">
                     <h2>
-                        <#if 1 == article.articlePerfect>
-                        <svg height="14" viewBox="2 1 11 12" width="12">${perfectIcon}</svg>
-                        </#if>
-                        <#if 1 == article.articleType>
-                        <span class="icon-locked" title="${discussionLabel}"></span>
-                        <#elseif 2 == article.articleType>
-                        <span class="icon-feed" title="${cityBroadcastLabel}"></span>
-                        <#elseif 3 == article.articleType>
-                        <span class="icon-video" title="${thoughtLabel}"></span>
-                        </#if>
+                        <@icon article.articlePerfect article.articleType></@icon>
                         <a data-id="${article.oId}" data-type="${article.articleType}" rel="bookmark"
                            href="${servePath}${article.articlePermalink}">${article.articleTitleEmoj}
                         </a>
-                        <#if articleStickCheck??>
-                        <#if article.articleStick < 9223372036854775807>
+                        <#if article.articleStick gt 0 && article.articleStick < 9223372036854775807>
                         <span class="ft-smaller ft-red stick-remains fn-none">${stickLabel}${remainsLabel} ${article.articleStickRemains?c} ${minuteLabel}</span>
                         </#if>
-                        </#if>
                     </h2>
-                    <#list article.articleTagObjs as articleTag>
-                    <a rel="tag" class="tag" href="${servePath}/tag/${articleTag.tagURI}">${articleTag.tagTitle}</a> 
-                    </#list>
                     <div class="ft-smaller">
                     <span class="ft-fade">${article.timeAgo}</span>
                     <#if "" != article.articleLatestCmterName>
@@ -58,7 +45,7 @@
 </#macro>
 <#macro listScript>
 <#if articleIds??>
-<script type="text/javascript" src="${staticServePath}/js/channel${miniPostfix}.js?${staticResourceVersion}"></script>
+<script src="${staticServePath}/js/channel${miniPostfix}.js?${staticResourceVersion}"></script>
 <script>
     // Init [Article List] channel
     ArticleListChannel.init("${wsScheme}://${serverHost}:${serverPort}${contextPath}/article-list-channel?articleIds=${articleIds}");

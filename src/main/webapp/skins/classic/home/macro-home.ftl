@@ -1,5 +1,6 @@
 <#macro home type>
 <#include "../macro-head.ftl">
+<#include "../common/title-icon.ftl">
 <!DOCTYPE html>
 <html>
     <head>
@@ -10,7 +11,6 @@
         <#elseif type == "comments">
         <@head title="${cmtLabel} - ${user.userName} - ${symphonyLabel}">
         <meta name="description" content="${user.userName}${deLabel}${cmtLabel}"/>
-        <link type="text/css" rel="stylesheet" href="${staticServePath}/js/lib/highlight.js-9.6.0/styles/github.css">
         </@head>
         <#elseif type == "followingUsers">
         <@head title="${followingUsersLabel} - ${user.userName} - ${symphonyLabel}">
@@ -23,6 +23,10 @@
         <#elseif type == "followingArticles">
         <@head title="${followingArticlesLabel} - ${user.userName} - ${symphonyLabel}">
         <meta name="description" content="${user.userName}${deLabel}${followingArticlesLabel}"/>
+        </@head>
+        <#elseif type == "watchingArticles">
+            <@head title="${watchingArticlesLabel} - ${user.userName} - ${symphonyLabel}">
+            <meta name="description" content="${user.userName}${deLabel}${watchingArticlesLabel}"/>
         </@head>
         <#elseif type == "followers">
         <@head title="${followersLabel} - ${user.userName} - ${symphonyLabel}">
@@ -43,47 +47,39 @@
         <#elseif type == "commentsAnonymous">
         <@head title="${anonymousCommentLabel} - ${user.userName} - ${symphonyLabel}">
         <meta name="description" content="${user.userName}${deLabel}${anonymousCommentLabel}"/>
-        <link type="text/css" rel="stylesheet" href="${staticServePath}/js/lib/highlight.js-9.6.0/styles/github.css">
         </@head>
         <#elseif type == "linkForge">
         <@head title="${linkForgeLabel} - ${user.userName} - ${symphonyLabel}">
         <meta name="description" content="${user.userName}${deLabel}${linkForgeLabel}"/>
         </@head>
         </#if>
-        <link type="text/css" rel="stylesheet" href="${staticServePath}/css/home.css?${staticResourceVersion}" />
+        <link rel="stylesheet" href="${staticServePath}/css/home.css?${staticResourceVersion}" />
+        <link rel="stylesheet" href="${staticServePath}/js/lib/highlight.js-9.6.0/styles/github.css">
     </head>
     <body>
         <#include "../header.ftl">
         <div class="main">
             <div class="wrapper">
-                <div class="content">
-                    <div<#if type != "linkForge"> class="module"</#if>>
+                <div class="content" id="home-pjax-container">
+                    <#if pjax><!---- pjax {#home-pjax-container} start ----></#if><div<#if type != "linkForge"> class="module"</#if>>
                     <#nested>
-                    </div>
+                    </div><#if pjax><!---- pjax {#home-pjax-container} end ----></#if>
                 </div>
                 <div class="side">
-                    <#if currentUser?? && currentUser.userName == user.userName>
-                    <#include "../common/person-info.ftl">
-                    <#else>
                     <#include "home-side.ftl">
-                    </#if>
-                    <div class="module">
-                        <div class="module-header"><h2>${goHomeLabel}</h2></div> 
-                        <div class="module-panel">
+                    <div class="module fn-none">
+                        <div class="module-header"><h2>${goHomeLabel}</h2></div>
+                        <div class="module-panel fn-oh">
                             <nav class="home-menu">
-                                <a <#if type == "home" || type == "comments" || type == "articlesAnonymous" || type == "commentsAnonymous">
+                                <a pjax-title="${articleLabel} - ${user.userName} - ${symphonyLabel}" <#if type == "home" || type == "comments" || type == "articlesAnonymous" || type == "commentsAnonymous">
                                     class="current"</#if>
-                                    href="${servePath}/member/${user.userName}"><svg height="18" viewBox="0 1 16 16" width="16">${boolIcon}</svg> ${postLabel}</a>
-                                <a <#if type == "followingUsers" || type == "followingTags" || type == "followingArticles" || type == "followers"> class="current"</#if>
-                                    href="${servePath}/member/${user.userName}/following/users"><svg height="18" viewBox="0 1 14 16" width="14">${starIcon}</svg> ${followLabel}</a>
-                                <a <#if type == "points"> class="current"</#if> href="${servePath}/member/${user.userName}/points">
-                                    <svg height="18" viewBox="0 1 14 16" width="14">${giftIcon}</svg> ${pointLabel}</a>
-                                <a <#if type == "linkForge"> class="current"</#if> href="${servePath}/member/${user.userName}/forge/link">
-                                    <svg height="18" viewBox="0 1 16 16" width="16">${baguaIcon}</svg>  ${forgeLabel}</a>
-                                <#if currentUser?? && currentUser.userName == user.userName>
-                                <a <#if type == "settings"> class="selected"</#if>
-                                    href="${servePath}/settings"><svg height="18" viewBox="0 1 14 16" width="14">${settingIcon}</svg> ${settingsLabel}</a>
-                                </#if>
+                                    href="${servePath}/member/${user.userName}"><svg><use xlink:href="#addfile"></use></svg> ${postLabel}</a>
+                                <a pjax-title="${watchingArticlesLabel} - ${user.userName} - ${symphonyLabel}" <#if type == "watchingArticles" || type == "followingUsers" || type == "followingTags" || type == "followingArticles" || type == "followers"> class="current"</#if>
+                                    href="${servePath}/member/${user.userName}/watching/articles"><svg><use xlink:href="#star"></use></svg> ${followLabel}</a>
+                                <a pjax-title="${pointLabel} - ${user.userName} - ${symphonyLabel}" <#if type == "points"> class="current"</#if> href="${servePath}/member/${user.userName}/points">
+                                    <svg><use xlink:href="#goods"></use></svg> ${pointLabel}</a>
+                                <a pjax-title="${linkForgeLabel} - ${user.userName} - ${symphonyLabel}" <#if type == "linkForge"> class="current"</#if> href="${servePath}/member/${user.userName}/forge/link">
+                                    <svg><use xlink:href="#bagua"></use></svg> ${forgeLabel}</a>
                             </nav>
                         </div>
                     </div>
@@ -91,7 +87,7 @@
         </div>
             </div>
         <#include "../footer.ftl">
-        <script type="text/javascript" src="${staticServePath}/js/settings${miniPostfix}.js?${staticResourceVersion}"></script>
+        <script src="${staticServePath}/js/settings${miniPostfix}.js?${staticResourceVersion}"></script>
         <script>
             Label.followLabel = "${followLabel}";
             Label.unfollowLabel = "${unfollowLabel}";
@@ -110,12 +106,10 @@
             Label.confirmPwdErrorLabel = "${confirmPwdErrorLabel}";
             Label.invalidUserNicknameLabel = "${invalidUserNicknameLabel}";
             Label.forgeUploadSuccLabel = "${forgeUploadSuccLabel}";
-            <#if type == 'commentsAnonymous' || 'comments' == type>
-            Settings.initHljs();
-            </#if>
-            <#if type == 'linkForge'>
-                Util.linkForge();
-            </#if>
+            Label.type = '${type}';
+            Label.userName = '${user.userName}';
+
+            Settings.initHome();
         </script>
     </body>
 </html>

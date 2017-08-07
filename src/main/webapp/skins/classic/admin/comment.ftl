@@ -9,8 +9,8 @@
             <label for="oId">Id</label>
             <input type="text" id="oId" value="${comment.oId}" readonly="readonly" />
 
-            <label for="commentAuthorEmail">${userEmailLabel}</label>
-            <input type="text" id="commentAuthorEmail" name="commentAuthorEmail" value="${comment.commentAuthorEmail}" readonly="readonly" />
+            <label for="commentAuthorId">${authorIdLabel}</label>
+            <input type="text" id="commentAuthorId" name="commentAuthorId" value="${comment.commentAuthorId}" readonly="readonly" />
 
             <label for="commentOnArticleId">${articleLabel} Id</label>
             <input type="text" id="commentOnArticleId" name="commentOnArticleId" value="${comment.commentOnArticleId}" readonly="readonly" />
@@ -31,6 +31,8 @@
             </select>
         </div>
     </div>
+
+    <#if permissions["commentUpdateCommentBasic"].permissionGrant>
     <div class="module">
         <div class="module-header">
             <h2>${modifiableLabel}</h2>
@@ -57,13 +59,15 @@
             </form>
         </div>
     </div>
+    </#if>
 
+    <#if permissions["commentRemoveComment"].permissionGrant>
     <div class="module">
         <div class="module-header">
-            <h2 class="ft-red">${removeLabel}</h2>
+            <h2 class="ft-red">${removeDataLabel}</h2>
         </div>
         <div class="module-panel form fn-clear">
-            <form action="${servePath}/admin/remove-comment" method="POST" onsubmit="return window.confirm('Sure?')">
+            <form action="${servePath}/admin/remove-comment" method="POST" onsubmit="return window.confirm('${confirmRemoveLabel}')">
                 <label for="commentId">Id</label>
                 <input type="text" id="commentId" name="commentId" value="${comment.oId}" readonly="readonly"/>
 
@@ -72,5 +76,6 @@
             </form>
         </div>
     </div>
+    </#if>
 </div>
 </@admin>

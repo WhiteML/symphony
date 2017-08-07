@@ -6,7 +6,7 @@
         <meta name="robots" content="none" />
         </@head>
         <link rel="stylesheet" href="${staticServePath}/js/lib/editor/codemirror.min.css">
-        <link type="text/css" rel="stylesheet" href="${staticServePath}/js/lib/highlight.js-9.6.0/styles/github.css">
+        <link rel="stylesheet" href="${staticServePath}/js/lib/highlight.js-9.6.0/styles/github.css">
     </head>
     <body>
         <#include "../header.ftl">
@@ -27,15 +27,15 @@
                         <input id="articleTags" type="text" tabindex="3" 
                                value="<#if article??>${article.articleTags}<#else>${tags}</#if>" placeholder="${tagLabel}（${tagSeparatorTipLabel}）" autocomplete="off" />
                         </div>
-                        <#if domains?size != 0>
+                        <#if addArticleDomains?size != 0>
                         <div class="domains-tags">
-                            <#list domains as domain>
+                            <#list addArticleDomains as domain>
                                 <#if domain.domainTags?size gt 0>
                                     <span data-id="${domain.oId}" class="btn small<#if 0 == domain_index> current</#if>">${domain.domainTitle}</span>&nbsp;
                                 </#if>
                             </#list>
                             <div class="fn-hr5"></div>
-                            <#list domains as domain>
+                            <#list addArticleDomains as domain>
                                 <#if domain.domainTags?size gt 0>
                                 <div id="tags${domain.oId}" class="domain-tags<#if 0 != domain_index> fn-none</#if>">
                                     <#list domain.domainTags as tag>
@@ -55,7 +55,7 @@
                         <div class="fn-clear article-reward-content">
                             <textarea id="articleRewardContent" tabindex="4"
                                       placeholder="${rewardEditorPlaceholderLabel}"><#if article??>${article.articleRewardContent}</#if></textarea>
-                        </div>
+                        </div><br>
                         <div>
                             <input id="articleRewardPoint" type="number" tabindex="5" min="1" 
                                    <#if article?? && 0 < article.articleRewardPoint>data-orval="${article.articleRewardPoint}"</#if> 
@@ -87,25 +87,47 @@
                         <input class="fn-none" type="radio" name="articleType" value="${article.articleType}" checked="checked"/> 
                         </#if>
                     </div>
-                    <label class="anonymous-check">${anonymousLabel}<input
-                                    <#if article??> disabled="disabled"<#if 1 == article.articleAnonymous> checked</#if></#if>
-                                    type="checkbox" id="articleAnonymous"></label>
-                    <button class="red fn-right" tabindex="10" onclick="AddArticle.add('${csrfToken}')"><#if article??>${submitLabel}<#else>${postLabel}</#if></button><br/><br/>
+                    <div class="fn-clear">
+                        <#if article?? && permissions["commonRemoveArticle"].permissionGrant>
+                            <label class="ft-red fn-pointer" tabindex="11" onclick="AddArticle.remove('${csrfToken}', this)">${removeArticleLabel} &nbsp; &nbsp;</label>
+                        </#if>
+                        <#if hasB3Key>
+                            <label class="article-anonymous">${syncLabel}<input
+                                <#if article??> disabled="disabled"<#if article.syncWithSymphonyClient> checked</#if></#if>
+                                type="checkbox" id="syncWithSymphonyClient"></label>
+                        </#if>
+                        <#if permissions["commonAddArticleAnonymous"].permissionGrant>
+                            <label class="article-anonymous">&nbsp;  ${anonymousLabel}<input
+                                <#if article??> disabled="disabled"<#if 1 == article.articleAnonymous> checked</#if></#if>
+                                type="checkbox" id="articleAnonymous"></label>
+                        </#if>
+
+                        <#if article??>
+                            <#if permissions["commonUpdateArticle"].permissionGrant>
+                                <button class="fn-right" tabindex="10" onclick="AddArticle.add('${csrfToken}', this)">${submitLabel}</button>
+                            </#if>
+                        <#else>
+                            <#if permissions["commonAddArticle"].permissionGrant>
+                                <button class="fn-right" tabindex="10" onclick="AddArticle.add('${csrfToken}', this)">${postLabel}</button>
+                            </#if>
+                        </#if>
+                    </div>
+                    <br/>
                     <div class="fn-clear">
                             <#if !articleType??>
                             <#assign articleType=article.articleType>
                             </#if>
                             <#if 0 == articleType>
-                            <span class="icon-article"></span> ${articleLabel} 
+                                <svg><use xlink:href="#article"></use></svg> ${articleLabel}
                             <span class="ft-gray"><span class="ft-green">${addNormalArticleTipLabel}</span>
                             <#elseif 1 == articleType>
-                            <span class="icon-locked"></span> ${discussionLabel}
+                                <svg><use xlink:href="#locked"></use></svg> ${discussionLabel}
                             <span class="ft-gray">${addDiscussionArticleTipLabel}</span>
                             <#elseif 2 == articleType>
-                            <span class="icon-feed"></span> ${cityBroadcastLabel}
+                                <svg><use xlink:href="#feed"></use></svg> ${cityBroadcastLabel}
                             <span class="ft-gray">${addCityArticleTipLabel} <i>${broadcastPoint}</i> ${pointLabel}</span>
                             <#elseif 3 == articleType>
-                            <span class="icon-video"></span> ${thoughtLabel}
+                                <svg><use xlink:href="#video"></use></svg> ${thoughtLabel}
                             <span class="ft-gray">${addThoughtArticleTipLabel}
                                 <a href="https://hacpai.com/article/1441942422856" target="_blank">(?)</a></span>
                             </#if>
@@ -113,47 +135,65 @@
                 </div>
             </div>
         </div>
-        <#include "../footer.ftl">
+        <#include "../footer.ftl"/>
         <script src="${staticServePath}/js/lib/editor/codemirror.min.js?4.13"></script>
-        <script type="text/javascript" src="${staticServePath}/js/lib/highlight.js-9.6.0/highlight.pack.js"></script>
-        <script type="text/javascript" src="${staticServePath}/js/lib/jquery/file-upload-9.10.1/jquery.fileupload.min.js"></script>
-        <script type="text/javascript" src="${staticServePath}/js/lib/sound-recorder/SoundRecorder.js"></script>
+        <script src="${staticServePath}/js/lib/highlight.js-9.6.0/highlight.pack.js"></script>
+        <script src="${staticServePath}/js/lib/jquery/file-upload-9.10.1/jquery.fileupload.min.js"></script>
+        <script src="${staticServePath}/js/lib/sound-recorder/SoundRecorder.js"></script>
         <script>
-                        Label.articleTitleErrorLabel = "${articleTitleErrorLabel}";
-                        Label.articleContentErrorLabel = "${articleContentErrorLabel}";
-                        Label.tagsErrorLabel = "${tagsErrorLabel}";
-                        Label.userName = "${userName}";
-                        Label.recordDeniedLabel = "${recordDeniedLabel}";
-                        Label.recordDeviceNotFoundLabel = "${recordDeviceNotFoundLabel}";
-                        Label.uploadLabel = "${uploadLabel}";
-                        Label.audioRecordingLabel = '${audioRecordingLabel}';
-                        Label.articleRewardPointErrorLabel = '${articleRewardPointErrorLabel}';
-                        Label.discussionLabel = '${discussionLabel}';
-                        <#if article??>Label.articleOId = '${article.oId}' ;</#if>
+            Label.articleTitleErrorLabel = "${articleTitleErrorLabel}";
+            Label.articleContentErrorLabel = "${articleContentErrorLabel}";
+            Label.tagsErrorLabel = "${tagsErrorLabel}";
+            Label.userName = "${currentUser.userName}";
+            Label.recordDeniedLabel = "${recordDeniedLabel}";
+            Label.recordDeviceNotFoundLabel = "${recordDeviceNotFoundLabel}";
+            Label.uploadLabel = "${uploadLabel}";
+            Label.audioRecordingLabel = '${audioRecordingLabel}';
+            Label.uploadingLabel = '${uploadingLabel}';
+            Label.articleRewardPointErrorLabel = '${articleRewardPointErrorLabel}';
+            Label.discussionLabel = '${discussionLabel}';
+            Label.insertEmojiLabel = '${insertEmojiLabel}';
+            Label.addBoldLabel = '${addBoldLabel}';
+            Label.addItalicLabel = '${addItalicLabel}';
+            Label.insertQuoteLabel = '${insertQuoteLabel}';
+            Label.addBulletedLabel = '${addBulletedLabel}';
+            Label.addNumberedListLabel = '${addNumberedListLabel}';
+            Label.addLinkLabel = '${addLinkLabel}';
+            Label.undoLabel = '${undoLabel}';
+            Label.redoLabel = '${redoLabel}';
+            Label.previewLabel = '${previewLabel}';
+            Label.helpLabel = '${helpLabel}';
+            Label.fullscreenLabel = '${fullscreenLabel}';
+            Label.uploadFileLabel = '${uploadFileLabel}';
+            Label.qiniuDomain = '${qiniuDomain}';
+            Label.qiniuUploadToken = '${qiniuUploadToken}';
+            Label.commonAtUser = '${permissions["commonAtUser"].permissionGrant?c}';
+            <#if article??>Label.articleOId = '${article.oId}' ;</#if>
+            Label.articleType = ${articleType};
+            Label.confirmRemoveLabel = '${confirmRemoveLabel}';
         </script>
-        <script type="text/javascript" src="${staticServePath}/js/audio${miniPostfix}.js?${staticResourceVersion}"></script>
         <script src="${staticServePath}/js/add-article${miniPostfix}.js?${staticResourceVersion}"></script>
         <script>
-                        Util.uploadFile({
-                        "id": "fileUpload",
-                                "pasteZone": $("#articleContent").next().next(),
-                                "qiniuUploadToken": "${qiniuUploadToken}",
-                                "editor": AddArticle.editor,
-                                "uploadingLabel": "${uploadingLabel}",
-                                "qiniuDomain": "${qiniuDomain}",
-                                "imgMaxSize": ${imgMaxSize?c},
-                                "fileMaxSize": ${fileMaxSize?c}
-                        });
-                        Util.uploadFile({
-                        "id": "rewardFileUpload",
-                                "pasteZone": $("#articleRewardContent").next().next(),
-                                "qiniuUploadToken": "${qiniuUploadToken}",
-                                "editor": AddArticle.rewardEditor,
-                                "uploadingLabel": "${uploadingLabel}",
-                                "qiniuDomain": "${qiniuDomain}",
-                                "imgMaxSize": ${imgMaxSize?c},
-                                "fileMaxSize": ${fileMaxSize?c}
-                        });
+            Util.uploadFile({
+                "id": "fileUpload",
+                "pasteZone": $("#articleContent").next().next(),
+                "qiniuUploadToken": "${qiniuUploadToken}",
+                "editor": AddArticle.editor,
+                "uploadingLabel": "${uploadingLabel}",
+                "qiniuDomain": "${qiniuDomain}",
+                "imgMaxSize": ${imgMaxSize?c},
+                "fileMaxSize": ${fileMaxSize?c}
+            });
+            Util.uploadFile({
+                "id": "rewardFileUpload",
+                "pasteZone": $("#articleRewardContent").next().next(),
+                "qiniuUploadToken": "${qiniuUploadToken}",
+                "editor": AddArticle.rewardEditor,
+                "uploadingLabel": "${uploadingLabel}",
+                "qiniuDomain": "${qiniuDomain}",
+                "imgMaxSize": ${imgMaxSize?c},
+                "fileMaxSize": ${fileMaxSize?c}
+            });
         </script>
     </body>
 </html>

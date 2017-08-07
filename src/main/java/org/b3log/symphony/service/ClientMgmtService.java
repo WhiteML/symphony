@@ -1,6 +1,6 @@
 /*
  * Symphony - A modern community (forum/SNS/blog) platform written in Java.
- * Copyright (C) 2012-2016,  b3log.org & hacpai.com
+ * Copyright (C) 2012-2017,  b3log.org & hacpai.com
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,8 +17,8 @@
  */
 package org.b3log.symphony.service;
 
-import javax.inject.Inject;
 import org.b3log.latke.Keys;
+import org.b3log.latke.ioc.inject.Inject;
 import org.b3log.latke.logging.Level;
 import org.b3log.latke.logging.Logger;
 import org.b3log.latke.repository.RepositoryException;
@@ -42,7 +42,7 @@ public class ClientMgmtService {
     /**
      * Logger.
      */
-    private static final Logger LOGGER = Logger.getLogger(ClientMgmtService.class.getName());
+    private static final Logger LOGGER = Logger.getLogger(ClientMgmtService.class);
 
     /**
      * Client repository.
@@ -59,17 +59,15 @@ public class ClientMgmtService {
     /**
      * Adds a client by the specified request json object.
      *
-     * @param requestJSONObject the specified request json object (client), for example,      <pre>
-     * {
-     *     "oId": "",
-     *     "clientName": "",
-     *     "clientVersion": "",
-     *     "clientHost": "",
-     *     "clientAdminEmail": "",
-     *     ....
-     * }
-     * </pre>
-     *
+     * @param requestJSONObject the specified request json object (client), for example,
+     *                          {
+     *                          "oId": "",
+     *                          "clientName": "",
+     *                          "clientVersion": "",
+     *                          "clientHost": "",
+     *                          "clientAdminEmail": "",
+     *                          ....
+     *                          }
      * @throws ServiceException service exception
      */
     public void addClient(final JSONObject requestJSONObject) throws ServiceException {
@@ -99,17 +97,15 @@ public class ClientMgmtService {
     /**
      * Updates a client by the specified request json object.
      *
-     * @param requestJSONObject the specified request json object (client), for example,      <pre>
-     * {
-     *     "oId": "",
-     *     "clientName": "",
-     *     "clientVersion": "",
-     *     "clientHost": "",
-     *     "clientAdminEmail": "",
-     *     ....
-     * }
-     * </pre>
-     *
+     * @param requestJSONObject the specified request json object (client), for example,
+     *                          {
+     *                          "oId": "",
+     *                          "clientName": "",
+     *                          "clientVersion": "",
+     *                          "clientHost": "",
+     *                          "clientAdminEmail": "",
+     *                          ....
+     *                          }
      * @throws ServiceException service exception
      */
     public void updateClient(final JSONObject requestJSONObject) throws ServiceException {

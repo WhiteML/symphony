@@ -1,6 +1,6 @@
 /*
  * Symphony - A modern community (forum/SNS/blog) platform written in Java.
- * Copyright (C) 2012-2016,  b3log.org & hacpai.com
+ * Copyright (C) 2012-2017,  b3log.org & hacpai.com
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,13 +17,6 @@
  */
 package org.b3log.symphony.processor;
 
-import java.awt.Color;
-import java.awt.image.BufferedImage;
-import java.io.ByteArrayOutputStream;
-import javax.imageio.ImageIO;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.StringUtils;
 import org.b3log.latke.image.Image;
@@ -42,11 +35,20 @@ import org.patchca.service.Captcha;
 import org.patchca.service.ConfigurableCaptchaService;
 import org.patchca.word.RandomWordFactory;
 
+import javax.imageio.ImageIO;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.util.HashSet;
+import java.util.Set;
+
 /**
  * Captcha processor.
  *
  * @author <a href="http://88250.b3log.org">Liang Ding</a>
- * @version 2.2.0.6, Nov 13, 2016
+ * @version 2.2.0.7, Jan 10, 2017
  * @since 0.2.2
  */
 @RequestProcessor
@@ -55,12 +57,17 @@ public class CaptchaProcessor {
     /**
      * Logger.
      */
-    private static final Logger LOGGER = Logger.getLogger(CaptchaProcessor.class.getName());
+    private static final Logger LOGGER = Logger.getLogger(CaptchaProcessor.class);
 
     /**
      * Key of captcha.
      */
     public static final String CAPTCHA = "captcha";
+
+    /**
+     * Captchas.
+     */
+    public static final Set<String> CAPTCHAS = new HashSet<>();
 
     /**
      * Gets captcha.
@@ -87,12 +94,11 @@ public class CaptchaProcessor {
             final String challenge = captcha.getChallenge();
             final BufferedImage bufferedImage = captcha.getImage();
 
-            final HttpSession httpSession = request.getSession(false);
-
-            if (null != httpSession) {
-                LOGGER.log(Level.TRACE, "Captcha[{0}] for session[id={1}]", new Object[]{challenge, httpSession.getId()});
-                httpSession.setAttribute(CAPTCHA, challenge);
+            if (CAPTCHAS.size() > 64) {
+                CAPTCHAS.clear();
             }
+
+            CAPTCHAS.add(challenge);
 
             response.setHeader("Pragma", "no-cache");
             response.setHeader("Cache-Control", "no-cache");

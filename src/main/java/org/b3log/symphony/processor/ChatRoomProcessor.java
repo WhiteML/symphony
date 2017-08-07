@@ -1,6 +1,6 @@
 /*
  * Symphony - A modern community (forum/SNS/blog) platform written in Java.
- * Copyright (C) 2012-2016,  b3log.org & hacpai.com
+ * Copyright (C) 2012-2017,  b3log.org & hacpai.com
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,16 +18,9 @@
 package org.b3log.symphony.processor;
 
 import com.qiniu.util.Auth;
-import java.io.IOException;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import javax.inject.Inject;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.lang.StringUtils;
 import org.b3log.latke.Keys;
+import org.b3log.latke.ioc.inject.Inject;
 import org.b3log.latke.logging.Level;
 import org.b3log.latke.logging.Logger;
 import org.b3log.latke.model.User;
@@ -38,36 +31,32 @@ import org.b3log.latke.servlet.annotation.Before;
 import org.b3log.latke.servlet.annotation.RequestProcessing;
 import org.b3log.latke.servlet.annotation.RequestProcessor;
 import org.b3log.latke.servlet.renderer.freemarker.AbstractFreeMarkerRenderer;
-import org.b3log.symphony.model.Article;
-import org.b3log.symphony.model.Comment;
-import org.b3log.symphony.model.Common;
-import org.b3log.symphony.model.Notification;
-import org.b3log.symphony.model.UserExt;
+import org.b3log.symphony.model.*;
 import org.b3log.symphony.processor.advice.AnonymousViewCheck;
+import org.b3log.symphony.processor.advice.PermissionGrant;
 import org.b3log.symphony.processor.advice.stopwatch.StopwatchEndAdvice;
 import org.b3log.symphony.processor.advice.stopwatch.StopwatchStartAdvice;
 import org.b3log.symphony.processor.advice.validate.ChatMsgAddValidation;
 import org.b3log.symphony.processor.channel.ChatRoomChannel;
-import static org.b3log.symphony.processor.channel.ChatRoomChannel.SESSIONS;
-import org.b3log.symphony.service.ArticleQueryService;
-import org.b3log.symphony.service.CommentMgmtService;
-import org.b3log.symphony.service.CommentQueryService;
-import org.b3log.symphony.service.NotificationMgmtService;
-import org.b3log.symphony.service.NotificationQueryService;
-import org.b3log.symphony.service.ShortLinkQueryService;
-import org.b3log.symphony.service.TuringQueryService;
-import org.b3log.symphony.service.UserMgmtService;
-import org.b3log.symphony.service.UserQueryService;
+import org.b3log.symphony.service.*;
 import org.b3log.symphony.util.Emotions;
-import org.b3log.symphony.util.Filler;
 import org.b3log.symphony.util.Markdowns;
 import org.b3log.symphony.util.Symphonys;
 import org.json.JSONObject;
 import org.jsoup.Jsoup;
 
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+
+import static org.b3log.symphony.processor.channel.ChatRoomChannel.SESSIONS;
+
 /**
  * Chat room processor.
- *
  * <ul>
  * <li>Shows char room (/cr, /chat-room, /community), GET</li>
  * <li>Sends chat message (/chat-room/send), POST</li>
@@ -75,7 +64,7 @@ import org.jsoup.Jsoup;
  * </ul>
  *
  * @author <a href="http://88250.b3log.org">Liang Ding</a>
- * @version 1.3.5.9, Oct 26, 2016
+ * @version 1.3.5.11, Apr 27, 2017
  * @since 1.4.0
  */
 @RequestProcessor
@@ -84,13 +73,18 @@ public class ChatRoomProcessor {
     /**
      * Logger.
      */
-    private static final Logger LOGGER = Logger.getLogger(ChatRoomProcessor.class.getName());
+    private static final Logger LOGGER = Logger.getLogger(ChatRoomProcessor.class);
 
     /**
-     * Filler.
+     * Chat messages.
+     */
+    public static LinkedList<JSONObject> messages = new LinkedList<JSONObject>();
+
+    /**
+     * Data model service.
      */
     @Inject
-    private Filler filler;
+    private DataModelService dataModelService;
 
     /**
      * Turing query service.
@@ -147,17 +141,12 @@ public class ChatRoomProcessor {
     private ArticleQueryService articleQueryService;
 
     /**
-     * Chat messages.
-     */
-    public static LinkedList<JSONObject> messages = new LinkedList<JSONObject>();
-
-    /**
      * XiaoV replies Stm.
      *
-     * @param context the specified context
-     * @param request the specified request
+     * @param context  the specified context
+     * @param request  the specified request
      * @param response the specified response
-     * @throws IOException io exception
+     * @throws IOException      io exception
      * @throws ServletException servlet exception
      */
     @RequestProcessing(value = "/cron/xiaov", method = HTTPRequestMethod.GET)
@@ -174,7 +163,6 @@ public class ChatRoomProcessor {
             final int avatarViewMode = (int) request.getAttribute(UserExt.USER_AVATAR_VIEW_MODE);
 
             final String xiaoVUserId = xiaoV.optString(Keys.OBJECT_ID);
-            final String xiaoVEmail = xiaoV.optString(User.USER_EMAIL);
             final JSONObject result = notificationQueryService.getAtNotifications(
                     avatarViewMode, xiaoVUserId, 1, 1); // Just get the latest one
             final List<JSONObject> notifications = (List<JSONObject>) result.get(Keys.RESULTS);
@@ -185,12 +173,9 @@ public class ChatRoomProcessor {
                 }
 
                 String xiaoVSaid = "";
-
                 final JSONObject comment = new JSONObject();
-
                 String articleId = StringUtils.substringBetween(notification.optString(Common.URL),
                         "/article/", "#");
-
                 String q = "";
 
                 if (!StringUtils.isBlank(articleId)) {
@@ -218,7 +203,6 @@ public class ChatRoomProcessor {
 
                     comment.put(Comment.COMMENT_CONTENT, xiaoVSaid);
                     comment.put(Comment.COMMENT_AUTHOR_ID, xiaoVUserId);
-                    comment.put(Comment.COMMENT_AUTHOR_EMAIL, xiaoVEmail);
                     comment.put(Comment.COMMENT_ON_ARTICLE_ID, articleId);
 
                     xiaoV.remove(UserExt.USER_T_POINT_CC);
@@ -239,7 +223,6 @@ public class ChatRoomProcessor {
 
     /**
      * Adds a chat message.
-     *
      * <p>
      * The request json object (a chat message):
      * <pre>
@@ -249,16 +232,16 @@ public class ChatRoomProcessor {
      * </pre>
      * </p>
      *
-     * @param context the specified context
-     * @param request the specified request
+     * @param context  the specified context
+     * @param request  the specified request
      * @param response the specified response
-     * @throws IOException io exception
+     * @throws IOException      io exception
      * @throws ServletException servlet exception
      */
     @RequestProcessing(value = "/chat-room/send", method = HTTPRequestMethod.POST)
     @Before(adviceClass = {ChatMsgAddValidation.class})
     public synchronized void addChatRoomMsg(final HTTPRequestContext context,
-            final HttpServletRequest request, final HttpServletResponse response)
+                                            final HttpServletRequest request, final HttpServletResponse response)
             throws IOException, ServletException {
         context.renderJSON();
 
@@ -318,16 +301,16 @@ public class ChatRoomProcessor {
     /**
      * Shows chat room.
      *
-     * @param context the specified context
-     * @param request the specified request
+     * @param context  the specified context
+     * @param request  the specified request
      * @param response the specified response
      * @throws Exception exception
      */
     @RequestProcessing(value = {"/cr", "/chat-room", "/community"}, method = HTTPRequestMethod.GET)
     @Before(adviceClass = {StopwatchStartAdvice.class, AnonymousViewCheck.class})
-    @After(adviceClass = StopwatchEndAdvice.class)
+    @After(adviceClass = {PermissionGrant.class, StopwatchEndAdvice.class})
     public void showChatRoom(final HTTPRequestContext context,
-            final HttpServletRequest request, final HttpServletResponse response) throws Exception {
+                             final HttpServletRequest request, final HttpServletResponse response) throws Exception {
         final AbstractFreeMarkerRenderer renderer = new SkinRenderer(request);
         context.setRenderer(renderer);
         renderer.setTemplateName("chat-room.ftl");
@@ -348,21 +331,21 @@ public class ChatRoomProcessor {
 
         dataModel.put(Common.ONLINE_CHAT_CNT, SESSIONS.size());
 
-        filler.fillHeaderAndFooter(request, response, dataModel);
+        dataModelService.fillHeaderAndFooter(request, response, dataModel);
 
         final int avatarViewMode = (int) request.getAttribute(UserExt.USER_AVATAR_VIEW_MODE);
 
-        filler.fillRandomArticles(avatarViewMode, dataModel);
-        filler.fillSideHotArticles(avatarViewMode, dataModel);
-        filler.fillSideTags(dataModel);
-        filler.fillLatestCmts(dataModel);
+        dataModelService.fillRandomArticles(avatarViewMode, dataModel);
+        dataModelService.fillSideHotArticles(avatarViewMode, dataModel);
+        dataModelService.fillSideTags(dataModel);
+        dataModelService.fillLatestCmts(dataModel);
     }
 
     /**
      * XiaoV push API.
      *
-     * @param context the specified context
-     * @param request the specified request
+     * @param context  the specified context
+     * @param request  the specified request
      * @param response the specified response
      * @throws Exception exception
      */
@@ -370,7 +353,7 @@ public class ChatRoomProcessor {
     @Before(adviceClass = StopwatchStartAdvice.class)
     @After(adviceClass = StopwatchEndAdvice.class)
     public synchronized void receiveXiaoV(final HTTPRequestContext context,
-            final HttpServletRequest request, final HttpServletResponse response) throws Exception {
+                                          final HttpServletRequest request, final HttpServletResponse response) throws Exception {
 //        final String key = Symphonys.get("xiaov.key");
 //        if (!key.equals(request.getParameter("key"))) {
 //            response.sendError(HttpServletResponse.SC_FORBIDDEN);

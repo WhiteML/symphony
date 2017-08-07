@@ -1,6 +1,6 @@
 /*
  * Symphony - A modern community (forum/SNS/blog) platform written in Java.
- * Copyright (C) 2012-2016,  b3log.org & hacpai.com
+ * Copyright (C) 2012-2017,  b3log.org & hacpai.com
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,16 +17,10 @@
  */
 package org.b3log.symphony.processor;
 
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import javax.inject.Inject;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.lang.time.DateFormatUtils;
 import org.apache.commons.lang.time.DateUtils;
 import org.b3log.latke.Keys;
+import org.b3log.latke.ioc.inject.Inject;
 import org.b3log.latke.servlet.HTTPRequestContext;
 import org.b3log.latke.servlet.HTTPRequestMethod;
 import org.b3log.latke.servlet.annotation.After;
@@ -38,19 +32,22 @@ import org.b3log.symphony.model.Common;
 import org.b3log.symphony.model.Option;
 import org.b3log.symphony.model.UserExt;
 import org.b3log.symphony.processor.advice.AnonymousViewCheck;
+import org.b3log.symphony.processor.advice.PermissionGrant;
 import org.b3log.symphony.processor.advice.stopwatch.StopwatchEndAdvice;
 import org.b3log.symphony.processor.advice.stopwatch.StopwatchStartAdvice;
-import org.b3log.symphony.service.ArticleQueryService;
-import org.b3log.symphony.service.CommentQueryService;
-import org.b3log.symphony.service.OptionQueryService;
-import org.b3log.symphony.service.UserQueryService;
-import org.b3log.symphony.util.Filler;
+import org.b3log.symphony.service.*;
 import org.b3log.symphony.util.Times;
 import org.json.JSONObject;
 
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+
 /**
  * Data statistic processor.
- *
  * <ul>
  * <li>Shows data statistic (/statistic), GET</li>
  * </ul>
@@ -62,36 +59,6 @@ import org.json.JSONObject;
  */
 @RequestProcessor
 public class StatisticProcessor {
-
-    /**
-     * User query service.
-     */
-    @Inject
-    private UserQueryService userQueryService;
-
-    /**
-     * Article query service.
-     */
-    @Inject
-    private ArticleQueryService articleQueryService;
-
-    /**
-     * Comment query service.
-     */
-    @Inject
-    private CommentQueryService commentQueryService;
-
-    /**
-     * Option query service.
-     */
-    @Inject
-    private OptionQueryService optionQueryService;
-
-    /**
-     * Filler.
-     */
-    @Inject
-    private Filler filler;
 
     /**
      * Month days.
@@ -134,11 +101,41 @@ public class StatisticProcessor {
     private final List<Integer> historyCommentCnts = new ArrayList<>();
 
     /**
+     * User query service.
+     */
+    @Inject
+    private UserQueryService userQueryService;
+
+    /**
+     * Article query service.
+     */
+    @Inject
+    private ArticleQueryService articleQueryService;
+
+    /**
+     * Comment query service.
+     */
+    @Inject
+    private CommentQueryService commentQueryService;
+
+    /**
+     * Option query service.
+     */
+    @Inject
+    private OptionQueryService optionQueryService;
+
+    /**
+     * Data model service.
+     */
+    @Inject
+    private DataModelService dataModelService;
+
+    /**
      * Loads statistic data.
      *
-     * @param request the specified HTTP servlet request
+     * @param request  the specified HTTP servlet request
      * @param response the specified HTTP servlet response
-     * @param context the specified HTTP request context
+     * @param context  the specified HTTP request context
      * @throws Exception exception
      */
     @RequestProcessing(value = "/cron/stat", method = HTTPRequestMethod.GET)
@@ -202,16 +199,16 @@ public class StatisticProcessor {
     /**
      * Shows data statistic.
      *
-     * @param context the specified context
-     * @param request the specified request
+     * @param context  the specified context
+     * @param request  the specified request
      * @param response the specified response
      * @throws Exception exception
      */
     @RequestProcessing(value = "/statistic", method = HTTPRequestMethod.GET)
     @Before(adviceClass = {StopwatchStartAdvice.class, AnonymousViewCheck.class})
-    @After(adviceClass = StopwatchEndAdvice.class)
+    @After(adviceClass = {PermissionGrant.class, StopwatchEndAdvice.class})
     public void showStatistic(final HTTPRequestContext context,
-            final HttpServletRequest request, final HttpServletResponse response) throws Exception {
+                              final HttpServletRequest request, final HttpServletResponse response) throws Exception {
         final AbstractFreeMarkerRenderer renderer = new SkinRenderer(request);
         context.setRenderer(renderer);
         renderer.setTemplateName("statistic.ftl");
@@ -227,14 +224,14 @@ public class StatisticProcessor {
         dataModel.put("historyArticleCnts", historyArticleCnts);
         dataModel.put("historyCommentCnts", historyCommentCnts);
 
-        filler.fillHeaderAndFooter(request, response, dataModel);
+        dataModelService.fillHeaderAndFooter(request, response, dataModel);
 
         final int avatarViewMode = (int) request.getAttribute(UserExt.USER_AVATAR_VIEW_MODE);
 
-        filler.fillRandomArticles(avatarViewMode, dataModel);
-        filler.fillSideHotArticles(avatarViewMode, dataModel);
-        filler.fillSideTags(dataModel);
-        filler.fillLatestCmts(dataModel);
+        dataModelService.fillRandomArticles(avatarViewMode, dataModel);
+        dataModelService.fillSideHotArticles(avatarViewMode, dataModel);
+        dataModelService.fillSideTags(dataModel);
+        dataModelService.fillLatestCmts(dataModel);
 
         dataModel.put(Common.ONLINE_VISITOR_CNT, optionQueryService.getOnlineVisitorCount());
         dataModel.put(Common.ONLINE_MEMBER_CNT, optionQueryService.getOnlineMemberCount());

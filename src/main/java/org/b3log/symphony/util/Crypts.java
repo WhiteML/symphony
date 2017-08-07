@@ -1,6 +1,6 @@
 /*
  * Symphony - A modern community (forum/SNS/blog) platform written in Java.
- * Copyright (C) 2012-2016,  b3log.org & hacpai.com
+ * Copyright (C) 2012-2017,  b3log.org & hacpai.com
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,14 +17,15 @@
  */
 package org.b3log.symphony.util;
 
-import java.security.SecureRandom;
+import org.apache.commons.codec.binary.Hex;
+import org.b3log.latke.logging.Level;
+import org.b3log.latke.logging.Logger;
+
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
-import org.apache.commons.codec.binary.Hex;
-import org.b3log.latke.logging.Level;
-import org.b3log.latke.logging.Logger;
+import java.security.SecureRandom;
 
 /**
  * Cryptology utilities.

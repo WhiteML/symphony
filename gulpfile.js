@@ -1,6 +1,6 @@
 /*
  * Symphony - A modern community (forum/SNS/blog) platform written in Java.
- * Copyright (C) 2012-2016,  b3log.org & hacpai.com
+ * Copyright (C) 2012-2017,  b3log.org & hacpai.com
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -15,12 +15,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-
 /**
  * @file frontend tool.
  * 
- * @author <a href="mailto:liliyuan@fangstar.net">Liyuan Li</a>
- * @version 1.3.3.0, Nov 13, 2016 
+ * @author <a href="http://vanessa.b3log.org">Liyuan Li</a>
+ * @author <a href="http://88250.b3log.org">Liang Ding</a>
+ * @version 1.6.3.2, Mar 5, 2017
  */
 
 'use strict';
@@ -91,7 +91,9 @@ gulp.task('build', ['sass', 'clean'], function () {
         './src/main/webapp/js/lib/reconnecting-websocket.min.js',
         './src/main/webapp/js/lib/jquery/jquery.bowknot.min.js',
         './src/main/webapp/js/lib/ua-parser.min.js',
-        './src/main/webapp/js/lib/jquery/jquery.hotkeys.js'];
+        './src/main/webapp/js/lib/jquery/jquery.hotkeys.js',
+        './src/main/webapp/js/lib/jquery/jquery.pjax.js',
+        './src/main/webapp/js/lib/nprogress/nprogress.js'];
     gulp.src(jsCommonLib)
             .pipe(uglify())
             .pipe(concat('libs.min.js'))
@@ -117,7 +119,7 @@ gulp.task('build', ['sass', 'clean'], function () {
         // end jquery.fileupload.min.js
         './src/main/webapp/js/lib/sound-recorder/SoundRecorder.js',
         './src/main/webapp/js/lib/jquery/jquery.qrcode.min.js',
-        './src/main/webapp/js/lib/zeroclipboard/ZeroClipboard.min.js'];
+        './src/main/webapp/js/lib/aplayer/APlayer.min.js'];
     gulp.src(jsArticleLib)
             .pipe(uglify())
             .pipe(concat('article-libs.min.js'))

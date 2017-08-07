@@ -18,12 +18,12 @@
                     <div class="slogan-text">
                         ${indexIntroLabel} &nbsp; &nbsp;
                         <a href="https://github.com/b3log/symphony" target="_blank" class="tooltipped tooltipped-n" aria-label="${siteCodeLabel}">
-                            <svg class="ft-gray" height="16" width="16" viewBox="0 0 16 16">${githubIcon}</svg></a> &nbsp;
+                            <svg><use xlink:href="#github"></use></svg></a> &nbsp;
                         <a href="http://weibo.com/u/2778228501" target="_blank" class="tooltipped tooltipped-n" aria-label="${followWeiboLabel}">
-                            <svg class="ft-gray" width="18" height="18" viewBox="0 0 37 30">${weiboIcon}</svg></a>   &nbsp; 
+                            <svg><use xlink:href="#weibo"></use></svg></a>   &nbsp;
                         <a target="_blank" class="tooltipped tooltipped-n" aria-label="${joinQQGroupLabel}"
-                           href="http://shang.qq.com/wpa/qunwpa?idkey=f77a54e7d2bd53bed4043f70838da92fa49eccda53e706ef2124943cb0df4df5">
-                            <svg class="ft-gray" width="16" height="16" viewBox="0 0 30 30">${qqIcon}</svg></a>
+                           href="http://shang.qq.com/wpa/qunwpa?idkey=981d9282616274abb1752336e21b8036828f715a1c4d0628adcf208f2fd54f3a">
+                            <svg><use xlink:href="#qq"></use></svg></a>
                     </div>
                 </div>
             </div>
@@ -50,7 +50,7 @@
         </div> 
 
         <#include '../footer.ftl'/>
-        <script type="text/javascript" src="${staticServePath}/js/channel${miniPostfix}.js?${staticResourceVersion}"></script>
+        <script src="${staticServePath}/js/channel${miniPostfix}.js?${staticResourceVersion}"></script>
         <script>
                             // Init [Timeline] channel
                             TimelineChannel.init("${wsScheme}://${serverHost}:${serverPort}${contextPath}/timeline-channel", 20);

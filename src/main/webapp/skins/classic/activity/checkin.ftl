@@ -4,7 +4,7 @@
     <head>
         <@head title="${activityDailyCheckinLabel} - ${activityLabel} - ${symphonyLabel}">
         </@head>
-        <link type="text/css" rel="stylesheet" href="${staticServePath}/css/index.css?${staticResourceVersion}" />
+        <link rel="stylesheet" href="${staticServePath}/css/index.css?${staticResourceVersion}" />
     </head>
     <body>
         <#include "../header.ftl">
@@ -17,9 +17,7 @@
                                  aria-label="${activityDailyCheckinLabel}" style="background-image:url('${staticServePath}/images/activities/checkin.png')"></div>
                             ${dailyCheckinLabel}
                         </h2>
-                        <br>
-                        <div id="captcha" class="fn-m10"></div>
-                        <br>
+                        <div id="captcha" class="fn-content"></div>
                     </div>
                 </div>
                 <div class="side">
@@ -28,14 +26,14 @@
             </div>
         </div>
         <#include "../footer.ftl">
-        <script type="text/javascript" src="${staticServePath}/js/activity${miniPostfix}.js?${staticResourceVersion}"></script>
-        <script src="https://static.geetest.com/static/tools/gt.js"></script>
+        <script src="${staticServePath}/js/activity${miniPostfix}.js?${staticResourceVersion}"></script>
+        <script src="//static.geetest.com/static/tools/gt.js"></script>
         <script>
             var handler = function (captchaObj) {
                 captchaObj.appendTo("#captcha");
                 captchaObj.onSuccess(function () {
                     var result = captchaObj.getValidate();
-                    window.location.href = "/activity/daily-checkin?geetest_challenge=" + result.geetest_challenge +
+                    window.location.href = "${servePath}/activity/daily-checkin?geetest_challenge=" + result.geetest_challenge +
                             "&geetest_validate=" + result.geetest_validate + "&geetest_seccode=" + result.geetest_seccode;
                 });
             };

@@ -1,7 +1,7 @@
 <#include "macro-top.ftl">
 <@top "checkin">
-<h2 class="sub-head"><span class="ft-gray">♣</span> ${checkinTopLabel}</h2>
-<div class="list top">
+<h2 class="sub-head"><span>♣</span> ${checkinTopLabel}</h2>
+<div class="list">
     <ul>
         <#list topCheckinUsers as user>
         <li>

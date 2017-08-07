@@ -1,6 +1,6 @@
 /*
  * Symphony - A modern community (forum/SNS/blog) platform written in Java.
- * Copyright (C) 2012-2016,  b3log.org & hacpai.com
+ * Copyright (C) 2012-2017,  b3log.org & hacpai.com
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,14 +17,15 @@
  */
 package org.b3log.symphony.processor.channel;
 
-import java.util.List;
-import java.util.Map;
+import org.b3log.latke.logging.Logger;
+
 import javax.servlet.http.HttpSession;
 import javax.websocket.HandshakeResponse;
 import javax.websocket.Session;
 import javax.websocket.server.HandshakeRequest;
 import javax.websocket.server.ServerEndpointConfig;
-import org.b3log.latke.logging.Logger;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Channel utilities.
@@ -38,7 +39,7 @@ public final class Channels {
     /**
      * Logger.
      */
-    private static final Logger LOGGER = Logger.getLogger(Channels.class.getName());
+    private static final Logger LOGGER = Logger.getLogger(Channels.class);
 
     /**
      * WebSocket configurator.

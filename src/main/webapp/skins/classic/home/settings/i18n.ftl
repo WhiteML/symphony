@@ -6,7 +6,6 @@
     </div>
 
     <div class="module-panel form fn-clear">
-        <br/>
         <label>${languageLabel}</label>
         <select id="userLanguage">
             <#list languages as language>
@@ -24,7 +23,7 @@
         <br/><br/>
         <div class="fn-clear"></div>
         <div id="i18nTip" class="tip"></div><br/>
-        <button class="green fn-right" onclick="Settings.update('i18n', '${csrfToken}')">${saveLabel}</button>
+        <button class="fn-right" onclick="Settings.update('i18n', '${csrfToken}')">${saveLabel}</button>
     </div>
 </div>
 </@home>

@@ -1,6 +1,6 @@
 /*
  * Symphony - A modern community (forum/SNS/blog) platform written in Java.
- * Copyright (C) 2012-2016,  b3log.org & hacpai.com
+ * Copyright (C) 2012-2017,  b3log.org & hacpai.com
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,12 +17,8 @@
  */
 package org.b3log.symphony.service;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.List;
-import javax.inject.Inject;
 import org.b3log.latke.Keys;
+import org.b3log.latke.ioc.inject.Inject;
 import org.b3log.latke.logging.Level;
 import org.b3log.latke.logging.Logger;
 import org.b3log.latke.service.annotation.Service;
@@ -33,11 +29,15 @@ import org.b3log.symphony.repository.TagUserLinkRepository;
 import org.b3log.symphony.util.Symphonys;
 import org.json.JSONObject;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
 /**
  * Link query service.
  *
  * @author <a href="http://88250.b3log.org">Liang Ding</a>
- * @version 1.0.1.2, Oct 13, 2016
+ * @version 1.0.1.4, Apr 21, 2017
  * @since 1.6.0
  */
 @Service
@@ -46,7 +46,7 @@ public class LinkForgeQueryService {
     /**
      * Logger.
      */
-    private static final Logger LOGGER = Logger.getLogger(LinkForgeQueryService.class.getName());
+    private static final Logger LOGGER = Logger.getLogger(LinkForgeQueryService.class);
 
     /**
      * Max tag count.
@@ -102,12 +102,7 @@ public class LinkForgeQueryService {
 
         try {
             List<JSONObject> cachedTags = tagCache.getTags();
-            Collections.sort(cachedTags, new Comparator<JSONObject>() {
-                @Override
-                public int compare(final JSONObject o1, final JSONObject o2) {
-                    return o2.optInt(Tag.TAG_LINK_CNT) - o1.optInt(Tag.TAG_LINK_CNT);
-                }
-            });
+            Collections.sort(cachedTags, (o1, o2) -> o2.optInt(Tag.TAG_LINK_CNT) - o1.optInt(Tag.TAG_LINK_CNT));
 
             for (final JSONObject cachedTag : cachedTags) {
                 cachedTags = cachedTags.size() > TAG_MAX_COUNT ? cachedTags.subList(0, TAG_MAX_COUNT) : cachedTags;
@@ -142,12 +137,7 @@ public class LinkForgeQueryService {
                 ret.add(tag);
             }
 
-            Collections.sort(ret, new Comparator<JSONObject>() {
-                @Override
-                public int compare(final JSONObject tag1, final JSONObject tag2) {
-                    return tag2.optInt(Tag.TAG_T_LINKS_CNT) - tag1.optInt(Tag.TAG_T_LINKS_CNT);
-                }
-            });
+            Collections.sort(ret, (tag1, tag2) -> tag2.optInt(Tag.TAG_T_LINKS_CNT) - tag1.optInt(Tag.TAG_T_LINKS_CNT));
         } catch (final Exception e) {
             LOGGER.log(Level.ERROR, "Gets forged links failed", e);
         }
@@ -176,12 +166,7 @@ public class LinkForgeQueryService {
         try {
             List<JSONObject> cachedTags = tagCache.getTags();
 
-            Collections.sort(cachedTags, new Comparator<JSONObject>() {
-                @Override
-                public int compare(final JSONObject o1, final JSONObject o2) {
-                    return o2.optInt(Tag.TAG_LINK_CNT) - o1.optInt(Tag.TAG_LINK_CNT);
-                }
-            });
+            Collections.sort(cachedTags, (o1, o2) -> o2.optInt(Tag.TAG_LINK_CNT) - o1.optInt(Tag.TAG_LINK_CNT));
 
             cachedTags = cachedTags.size() > TAG_MAX_COUNT ? cachedTags.subList(0, TAG_MAX_COUNT) : cachedTags;
 
@@ -199,7 +184,7 @@ public class LinkForgeQueryService {
                 tag.put(Tag.TAG_ICON_PATH, cachedTag.optString(Tag.TAG_ICON_PATH));
 
                 // query link id
-                final List<String> linkIds = tagUserLinkRepository.getByTagId(tagId, LINK_MAX_COUNT);
+                final List<String> linkIds = tagUserLinkRepository.getLinkIdsByTagId(tagId, LINK_MAX_COUNT);
                 if (linkIds.isEmpty()) {
                     continue;
                 }
@@ -216,12 +201,7 @@ public class LinkForgeQueryService {
                 ret.add(tag);
             }
 
-            Collections.sort(ret, new Comparator<JSONObject>() {
-                @Override
-                public int compare(final JSONObject tag1, final JSONObject tag2) {
-                    return tag2.optInt(Tag.TAG_T_LINKS_CNT) - tag1.optInt(Tag.TAG_T_LINKS_CNT);
-                }
-            });
+            Collections.sort(ret, (tag1, tag2) -> tag2.optInt(Tag.TAG_T_LINKS_CNT) - tag1.optInt(Tag.TAG_T_LINKS_CNT));
         } catch (final Exception e) {
             LOGGER.log(Level.ERROR, "Gets forged links failed", e);
         }

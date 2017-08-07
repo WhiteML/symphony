@@ -38,7 +38,7 @@
                     <#elseif type == "help">
                     ${helpLabel}
                     </#if>
-                    <span class="icon-chevron-down fn-right"></span>
+                    <svg class="fn-right"><use xlink:href="#chevron-down"></use></svg>
                 </div>
                 <div class="fn-hr5"></div>
                 <ul class="tab fn-clear fn-none">
@@ -65,7 +65,7 @@
             </div>
         </div>
         <#include "../../footer.ftl">
-        <script type="text/javascript" src="${staticServePath}/js/settings${miniPostfix}.js?${staticResourceVersion}"></script>
+        <script src="${staticServePath}/js/settings${miniPostfix}.js?${staticResourceVersion}"></script>
         <script>
                     Label.followLabel = "${followLabel}";
                     Label.unfollowLabel = "${unfollowLabel}";

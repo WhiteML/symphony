@@ -7,7 +7,7 @@
         <@head title="${perfectLabel} - ${symphonyLabel}">
         <meta name="description" content="${symDescriptionLabel}"/>
         </@head>
-        <link type="text/css" rel="stylesheet" href="${staticServePath}/css/index.css?${staticResourceVersion}" />
+        <link rel="stylesheet" href="${staticServePath}/css/index.css?${staticResourceVersion}" />
     </head>
     <body>
         <#include "header.ftl">
@@ -18,7 +18,7 @@
                         <@list listData=perfectArticles/>
                         <@pagination url="${servePath}/perfect"/>
                     </div>
-                    <#include "common/domains.ftl">
+
                 </div>
 
                 <div class="side">
@@ -26,6 +26,7 @@
                 </div>
             </div>
         </div>
+        <#include "common/domains.ftl">
         <#include "footer.ftl">
         <@listScript/>
     </body>

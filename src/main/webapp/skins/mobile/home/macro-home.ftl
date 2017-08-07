@@ -1,5 +1,6 @@
 <#macro home type>
 <#include "../macro-head.ftl">
+<#include "../common/title-icon.ftl">
 <!DOCTYPE html>
 <html>
     <head>
@@ -23,6 +24,10 @@
         <@head title="${followingArticlesLabel} - ${user.userName} - ${symphonyLabel}">
         <meta name="description" content="${user.userName}${deLabel}${followingArticlesLabel}"/>
         </@head>
+        <#elseif type == "watchingArticles">
+        <@head title="${watchingArticlesLabel} - ${user.userName} - ${symphonyLabel}">
+        <meta name="description" content="${user.userName}${deLabel}${watchingArticlesLabel}"/>
+        </@head>
         <#elseif type == "followers">
         <@head title="${followersLabel} - ${user.userName} - ${symphonyLabel}">
         <meta name="description" content="${user.userName}${deLabel}${followersLabel}"/>
@@ -43,7 +48,12 @@
         <@head title="${anonymousCommentLabel} - ${user.userName} - ${symphonyLabel}">
         <meta name="description" content="${user.userName}${deLabel}${settingsLabel}"/>
         </@head>
+        <#elseif type == "linkForge">
+        <@head title="${linkForgeLabel} - ${user.userName} - ${symphonyLabel}">
+        <meta name="description" content="${user.userName}${deLabel}${linkForgeLabel}"/>
+        </@head>
         </#if>
+        <link rel="stylesheet" href="${staticServePath}/js/lib/highlight.js-9.6.0/styles/github.css">
     </head>
     <body>
         <#include "../header.ftl">
@@ -61,6 +71,8 @@
                     ${followingTagsLabel}
                     <#elseif type == "followingArticles">
                     ${followingArticlesLabel}
+                    <#elseif type == "watchingArticles">
+                    ${watchingArticlesLabel}
                     <#elseif type == "followers">
                     ${followersLabel}
                     <#elseif type == "points">
@@ -71,8 +83,10 @@
                     ${anonymousLabel}${cmtLabel}
                     <#elseif type == "settings">
                     ${settingsLabel}
+                    <#elseif type == "linkForge">
+                    ${linkForgeLabel}
                     </#if>
-                    <span class="icon-chevron-down fn-right"></span>
+                    <svg class="fn-right"><use xlink:href="#chevron-down"></use></svg>
                 </div>
                 <div class="fn-hr5"></div>
                 <ul class="tab fn-clear fn-none">
@@ -81,6 +95,9 @@
                     </li>
                     <li<#if type == "comments"> class="fn-none"</#if>>
                         <a href="${servePath}/member/${user.userName}/comments">${cmtLabel}</a>
+                    </li>
+                    <li<#if type == "watchingArticles"> class="fn-none"</#if>>
+                    <a href="${servePath}/member/${user.userName}/watching/articles">${watchingArticlesLabel}</a>
                     </li>
                     <li<#if type == "followingUsers"> class="fn-none"</#if>>
                         <a href="${servePath}/member/${user.userName}/following/users">${followingUsersLabel}</a>
@@ -96,6 +113,9 @@
                     </li>
                     <li<#if type == "points"> class="fn-none"</#if>>
                         <a href="${servePath}/member/${user.userName}/points">${pointLabel}</a>
+                    </li>
+                    <li<#if type == "linkForge"> class="fn-none"</#if>>
+                    <a href="${servePath}/member/${user.userName}/forge/link">${linkForgeLabel}</a>
                     </li>
                     <#if currentUser?? && currentUser.userName == user.userName>
                     <li<#if type == "articlesAnonymous"> class="current"</#if>>
@@ -118,24 +138,29 @@
             </div>
         </div>
         <#include "../footer.ftl">
-        <script type="text/javascript" src="${staticServePath}/js/settings${miniPostfix}.js?${staticResourceVersion}"></script>
+        <script src="${staticServePath}/js/settings${miniPostfix}.js?${staticResourceVersion}"></script>
         <script>
-                    Label.followLabel = "${followLabel}";
-                    Label.unfollowLabel = "${unfollowLabel}";
-                    Label.invalidPasswordLabel = "${invalidPasswordLabel}";
-                    Label.amountNotEmpty = "${amountNotEmpty}";
-                    Label.invalidUserNameLabel = "${invalidUserNameLabel}";
-                    Label.loginNameErrorLabel = "${loginNameErrorLabel}";
-                    Label.updateSuccLabel = "${updateSuccLabel}";
-                    Label.transferSuccLabel = "${transferSuccLabel}";
-                    Label.invalidUserURLLabel = "${invalidUserURLLabel}";
-                    Label.tagsErrorLabel = "${tagsErrorLabel}";
-                    Label.invalidUserQQLabel = "${invalidUserQQLabel}";
-                    Label.invalidUserIntroLabel = "${invalidUserIntroLabel}";
-                    Label.invalidUserB3KeyLabel = "${invalidUserB3KeyLabel}";
-                    Label.invalidUserB3ClientURLLabel = "${invalidUserB3ClientURLLabel}";
-                    Label.confirmPwdErrorLabel = "${confirmPwdErrorLabel}";
-                    Label.invalidUserNicknameLabel = "${invalidUserNicknameLabel}";
+            Label.followLabel = "${followLabel}";
+            Label.unfollowLabel = "${unfollowLabel}";
+            Label.invalidPasswordLabel = "${invalidPasswordLabel}";
+            Label.amountNotEmpty = "${amountNotEmpty}";
+            Label.invalidUserNameLabel = "${invalidUserNameLabel}";
+            Label.loginNameErrorLabel = "${loginNameErrorLabel}";
+            Label.updateSuccLabel = "${updateSuccLabel}";
+            Label.transferSuccLabel = "${transferSuccLabel}";
+            Label.invalidUserURLLabel = "${invalidUserURLLabel}";
+            Label.tagsErrorLabel = "${tagsErrorLabel}";
+            Label.invalidUserQQLabel = "${invalidUserQQLabel}";
+            Label.invalidUserIntroLabel = "${invalidUserIntroLabel}";
+            Label.invalidUserB3KeyLabel = "${invalidUserB3KeyLabel}";
+            Label.invalidUserB3ClientURLLabel = "${invalidUserB3ClientURLLabel}";
+            Label.confirmPwdErrorLabel = "${confirmPwdErrorLabel}";
+            Label.invalidUserNicknameLabel = "${invalidUserNicknameLabel}";
+            Label.forgeUploadSuccLabel = "${forgeUploadSuccLabel}";
+            Label.type = '${type}';
+            Label.userName = '${user.userName}';
+
+            Settings.initHome();
         </script>
     </body>
 </html>

@@ -20,14 +20,14 @@
             </div>
         </div>
         <#include "../footer.ftl">
-        <script type="text/javascript" src="${staticServePath}/js/activity${miniPostfix}.js?${staticResourceVersion}"></script>
-        <script src="https://static.geetest.com/static/tools/gt.js"></script>
+        <script src="${staticServePath}/js/activity${miniPostfix}.js?${staticResourceVersion}"></script>
+        <script src="//static.geetest.com/static/tools/gt.js"></script>
         <script>
             var handler = function (captchaObj) {
                 captchaObj.appendTo("#captcha");
                 captchaObj.onSuccess(function () {
                     var result = captchaObj.getValidate();
-                    window.location.href = "/activity/daily-checkin?geetest_challenge=" + result.geetest_challenge +
+                    window.location.href = "${servePath}/activity/daily-checkin?geetest_challenge=" + result.geetest_challenge +
                             "&geetest_validate=" + result.geetest_validate + "&geetest_seccode=" + result.geetest_seccode;
                 });
             };

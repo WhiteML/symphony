@@ -1,6 +1,6 @@
 /*
  * Symphony - A modern community (forum/SNS/blog) platform written in Java.
- * Copyright (C) 2012-2016,  b3log.org & hacpai.com
+ * Copyright (C) 2012-2017,  b3log.org & hacpai.com
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,9 +17,10 @@
  */
 package org.b3log.symphony.model.sitemap;
 
+import org.b3log.latke.util.Strings;
+
 import java.util.ArrayList;
 import java.util.List;
-import org.b3log.latke.util.Strings;
 
 /**
  * Sitemap.

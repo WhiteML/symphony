@@ -29,12 +29,12 @@
                     <span class="article-action">
                     <span class='fn-right'>
                         <#if isLoggedIn && isFollowing>
-                        <span class="ft-red" onclick="Util.unfollow(this, '${tag.oId}', 'tag', ${tag.tagFollowerCount})"><span class="icon-star"></span> ${tag.tagFollowerCount}</span>
+                        <span class="ft-red" onclick="Util.unfollow(this, '${tag.oId}', 'tag', ${tag.tagFollowerCount})"><svg class="icon-star"><use xlink:href="#star"></use></svg> ${tag.tagFollowerCount}</span>
                         <#else>
-                        <span onclick="Util.follow(this, '${tag.oId}', 'tag', ${tag.tagFollowerCount})"><span class="icon-star"></span> ${tag.tagFollowerCount}</span>
+                        <span onclick="Util.follow(this, '${tag.oId}', 'tag', ${tag.tagFollowerCount})"><svg class="icon-star"><use xlink:href="#star"></use></svg> ${tag.tagFollowerCount}</span>
                         </#if>
-                        <#if isAdminLoggedIn> &nbsp;
-                        <a href="${servePath}/admin/tag/${tag.oId}"><span class="icon-setting"></span></a>
+                        <#if permissions["tagUpdateTagBasic"].permissionGrant> &nbsp;
+                        <a href="${servePath}/admin/tag/${tag.oId}"><svg><use xlink:href="#setting"></use></svg></a>
                         </#if>
                     </span>
                     </span>
@@ -101,7 +101,7 @@
                 </div>
                 <div class="fn-clear">
                     <@list listData=articles/>
-                    <@pagination url="/tag/${tag.tagURI}"/>
+                    <@pagination url="${servePath}/tag/${tag.tagURI}"/>
                 </div>
             </div> 
             <div class="side wrapper">

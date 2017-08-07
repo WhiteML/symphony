@@ -1,6 +1,6 @@
 /*
  * Symphony - A modern community (forum/SNS/blog) platform written in Java.
- * Copyright (C) 2012-2016,  b3log.org & hacpai.com
+ * Copyright (C) 2012-2017,  b3log.org & hacpai.com
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,7 +21,7 @@ package org.b3log.symphony.model;
  * This class defines all article model relevant keys.
  *
  * @author <a href="http://88250.b3log.org">Liang Ding</a>
- * @version 1.21.0.11, Oct 30, 2016
+ * @version 1.26.0.14, May 6, 2017
  * @since 0.2.0
  */
 public final class Article {
@@ -60,11 +60,6 @@ public final class Article {
      * Key of article tags.
      */
     public static final String ARTICLE_TAGS = "articleTags";
-
-    /**
-     * Key of article author email.
-     */
-    public static final String ARTICLE_AUTHOR_EMAIL = "articleAuthorEmail";
 
     /**
      * Key of article author id.
@@ -162,6 +157,11 @@ public final class Article {
     public static final String ARTICLE_COLLECT_CNT = "articleCollectCnt";
 
     /**
+     * Key of article watch count.
+     */
+    public static final String ARTICLE_WATCH_CNT = "articleWatchCnt";
+
+    /**
      * Key of reddit score.
      */
     public static final String REDDIT_SCORE = "redditScore";
@@ -201,7 +201,17 @@ public final class Article {
      */
     public static final String ARTICLE_ANONYMOUS_VIEW = "articleAnonymousView";
 
+    /**
+     * Key of article audio URL.
+     */
+    public static final String ARTICLE_AUDIO_URL = "articleAudioURL";
+
     //// Transient ////
+    /**
+     * Key of article revision count.
+     */
+    public static final String ARTICLE_REVISION_COUNT = "articleRevisionCount";
+
     /**
      * Key of article latest comment.
      */
@@ -228,11 +238,6 @@ public final class Article {
     public static final String ARTICLE_T_VOTE = "articleVote";
 
     /**
-     * Key of article stick check.
-     */
-    public static final String ARTICLE_T_STICK_CHECK = "articleStickCheck";
-
-    /**
      * Key of article stick flag.
      */
     public static final String ARTICLE_T_IS_STICK = "articleIsStick";
@@ -246,6 +251,11 @@ public final class Article {
      * Key of article preview content.
      */
     public static final String ARTICLE_T_PREVIEW_CONTENT = "articlePreviewContent";
+
+    /**
+     * Key of article thumbnail URL.
+     */
+    public static final String ARTICLE_T_THUMBNAIL_URL = "articleThumbnailURL";
 
     /**
      * Key of article view count display format.
@@ -333,6 +343,11 @@ public final class Article {
     public static final String ARTICLE_T_TITLE_EMOJI = "articleTitleEmoj";
 
     /**
+     * Key of article title with Emoji unicode.
+     */
+    public static final String ARTICLE_T_TITLE_EMOJI_UNICODE = "articleTitleEmojUnicode";
+
+    /**
      * Key of article heat.
      */
     public static final String ARTICLE_T_HEAT = "articleHeat";
@@ -413,18 +428,23 @@ public final class Article {
     public static final int ARTICLE_TYPE_C_THOUGHT = 3;
 
     /**
+     * Article type - <a href="https://hacpai.com/article/1483240295087">book</a>.
+     */
+    public static final int ARTICLE_TYPE_C_BOOK = 4;
+
+    /**
+     * Private constructor.
+     */
+    private Article() {
+    }
+
+    /**
      * Checks the specified article type is whether invalid.
      *
      * @param articleType the specified article type
      * @return {@code true} if it is invalid, otherwise returns {@code false}
      */
     public static boolean isInvalidArticleType(final int articleType) {
-        return articleType < 0 || articleType > Article.ARTICLE_TYPE_C_THOUGHT;
-    }
-
-    /**
-     * Private constructor.
-     */
-    private Article() {
+        return articleType < 0 || articleType > Article.ARTICLE_TYPE_C_BOOK;
     }
 }

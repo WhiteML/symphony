@@ -1,6 +1,6 @@
 <img src="https://cloud.githubusercontent.com/assets/873584/19897669/e6a6f5ce-a093-11e6-8cf3-8e5c2acea033.png">  
 
-<p align = "center">
+<p align="center">
 <a href="https://github.com/b3log/symphony/blob/master/README.md"><strong>English</strong></a> | <a href="https://github.com/b3log/symphony/blob/master/README_zh_CN.md"><strong>中文</strong></a>
 </p>
 
@@ -48,7 +48,7 @@
 * the ability to aggregate independent bloggers, to build and share quality resources
 * and `100%` open source
 
-Welcome to Sym official community - [HacPai](https://hacpai.com) for more details.
+Welcome to Sym official community - [HacPai](https://hacpai.com/register?r=88250) for more details.
 
 ### Motivation
 
@@ -68,16 +68,18 @@ Sym was born with the following reasons:
 
 ### Usecases
 
-Personal maintenance:
+Community edition:
 
-* [黑客派](https://hacpai.com)
 * [宽客网](http://www.cnq.net)
 * [贵州IT](http://www.gzit.info)
 * [超级产品经理](https://imspm.com)
-* [Titandb 学习主站](https://titandb.cn)
+* [蚂蚁程序猿](http://bbs.itmayiedu.com)
+* [漠游网](https://damoluomu.com)
+* [呆萌狮 - Demo's](http://www.daimengshi.com)
 
-Company maintenance:
+Commercial edition:
 
+* [黑客派](https://hacpai.com)
 * [四方环视](http://bbs.ivrpano.com)
 
 If you build it, you are welcome to add your site to this list by Pull Request :-p
@@ -159,7 +161,7 @@ In addition, users can also complete export data, including posts and replies.
 
 ![6](https://cloud.githubusercontent.com/assets/873584/19893290/afca2270-a083-11e6-9755-9a779c6d91b9.png)
 
-Post can be updated, but each update will produce a history of editing, visitors can see and compare the changes in its content. There is no support for subsequent replies update, will join, please look forward to.
+Post/reply can be updated, but each update will produce a history of editing, visitors can see and compare the changes in its content.
 
 Posts and replies can be used to publish anonymous identity, you know.
 
@@ -252,7 +254,6 @@ Record the achievements of the users and the contribution to the community.
 1. [Download](https://github.com/b3log/symphony/archive/master.zip) source code
 2. to modify the database after extracting `src/main/resources/local.properties` configuration, and create a database
 3. _may_ need to modify the `latke.properties` port for container port
-4. _may_ need to modify the `init.properties` administrator account
 3. use `mvn install` to build
 4. to deploy the war package to the container, the database table will be created automatically at the start of the first
 
@@ -286,7 +287,7 @@ If you need to use Sym for commercial use, including but not limited to the foll
 * company use
 * profitability
 
-You must pay the price for $2000, please contact QQ 845765 or email (DL88250@gmail.com) for detailed consultation.
+You must pay the price for $4000, please contact QQ 845765 or email (DL88250@gmail.com) for detailed consultation.
 
 ## Contribution
 
@@ -327,14 +328,14 @@ Sym's birth can not be separated from the following open source projects:
 * [ECharts](https://github.com/ecomfe/echarts): Front end interactive chart library
 * [MathJax](https://github.com/mathjax/MathJax): Front end Math rendering library
 * [SoundRecorder](https://github.com/rderveloy/JavaScript-Sound-Recorder): Front end HTML sound recorder
-* [ZeroClipboard](https://github.com/zeroclipboard/zeroclipboard): Front end clipboard
 * [JavaScript MD5](http://pajhome.org.uk/crypt/md5/index.html): Front endJavaScript MD5
 * [ReconnectingWebSocket](https://github.com/joewalnes/reconnecting-websocket): Front end WebSocket reconnecting
 * [to-markdown](https://github.com/domchristie/to-markdown): Front end HTML to Markdown
 * [UAParser.js](https://github.com/faisalman/ua-parser-js): Front end User-Agent parser
 * [Sass](http://sass-lang.com): Front end CSS preprocessor
 * [jsoup](https://github.com/jhy/jsoup): Java HTML parser
-* [pegdown](https://github.com/sirthias/pegdown): Java Markdown parser
+* [flexmark](https://github.com/vsch/flexmark-java): Java Markdown parser
+* [marked](https://github.com/chjj/marked): NodeJS Markdown parser
 * [Apache Commons](http://commons.apache.org): Java tool library
 * [Jodd](https://github.com/oblac/jodd): Java tool library
 * [emoji-java](https://github.com/vdurmont/emoji-java): Java Emoji tool library
@@ -343,6 +344,7 @@ Sym's birth can not be separated from the following open source projects:
 * [FreeMarker](http://freemarker.org): popular Java template engine
 * [Latke](https://github.com/b3log/latke): full-stack Java Web framework
 * [NetBeans](https://netbeans.org): wonderful IDE
+* [IntelliJ IDEA](https://www.jetbrains.com/idea): another wonderful IDE
 
 ----
 
@@ -351,4 +353,3 @@ Sym's birth can not be separated from the following open source projects:
 <br><br>
 <img src="https://cloud.githubusercontent.com/assets/873584/19897809/84c4ed56-a094-11e6-8498-43e9337c475f.png">
 </p>
-

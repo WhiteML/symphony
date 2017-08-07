@@ -1,6 +1,6 @@
 /*
  * Symphony - A modern community (forum/SNS/blog) platform written in Java.
- * Copyright (C) 2012-2016,  b3log.org & hacpai.com
+ * Copyright (C) 2012-2017,  b3log.org & hacpai.com
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
  * @fileoverview 聊天室
  *
  * @author <a href="http://vanessa.b3log.org">Liyuan Li</a>
- * @version 1.1.0.2, Sep 20, 2016
+ * @version 1.2.2.3, Apr 25, 2017
  */
 
 /**
@@ -60,20 +60,17 @@ var ChatRoom = {
                 dragDrop: false,
                 lineWrapping: true,
                 toolbar: [
+                    {name: 'emoji'},
                     {name: 'bold'},
                     {name: 'italic'},
-                    '|',
                     {name: 'quote'},
+                    {name: 'link'},
+                    {name: 'image', html: '<div class="tooltipped tooltipped-n" aria-label="' + Label.uploadFileLabel + '" ><form id="fileUpload" method="POST" enctype="multipart/form-data"><label class="icon-upload"><svg><use xlink:href="#upload"></use></svg><input type="file"/></label></form></div>'},
                     {name: 'unordered-list'},
                     {name: 'ordered-list'},
-                    '|',
-                    {name: 'link'},
-                    {name: 'image', html: '<form id="fileUpload" method="POST" enctype="multipart/form-data"><label class="icon-upload"><input type="file"/></label></form>'},
-                    '|',
-                    {name: 'redo'},
-                    {name: 'undo'},
-                    '|',
-                    {name: 'preview'}
+                    {name: 'view'},
+                    {name: 'fullscreen'},
+                    {name: 'question', action: 'https://hacpai.com/guide/markdown'}
                 ],
                 extraKeys: {
                     "Alt-/": "autocompleteUserName",
@@ -167,8 +164,8 @@ var ChatRoom = {
                     ChatRoom.editor.setValue('');
                     // reset comment editor
                     $('.editor-preview').html('');
-                    if ($('.icon-preview').hasClass('active')) {
-                        $('.icon-preview').click();
+                    if ($('.icon-view').parent().hasClass('active')) {
+                        $('.icon-view').click();
                     }
 
                     if (window.localStorage) {
@@ -188,4 +185,4 @@ var ChatRoom = {
         });
     }
 };
-ChatRoom.init();
+

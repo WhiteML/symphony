@@ -1,6 +1,6 @@
 /*
  * Symphony - A modern community (forum/SNS/blog) platform written in Java.
- * Copyright (C) 2012-2016,  b3log.org & hacpai.com
+ * Copyright (C) 2012-2017,  b3log.org & hacpai.com
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -23,7 +23,8 @@ import org.b3log.symphony.util.Symphonys;
  * This class defines all pointtransfer model relevant keys.
  *
  * @author <a href="http://88250.b3log.org">Liang Ding</a>
- * @version 1.19.1.0, Sep 19, 2016
+ * @author <a href="http://zephyr.b3log.org">Zephyr</a>
+ * @version 1.23.2.1, May 6, 2017
  * @since 1.3.0
  */
 public final class Pointtransfer {
@@ -123,7 +124,7 @@ public final class Pointtransfer {
     /**
      * Transfer sum - Add Comment.
      */
-    public static final int TRANSFER_SUM_C_ADD_COMMENT = Symphonys.getInt("porintAddComment");
+    public static final int TRANSFER_SUM_C_ADD_COMMENT = Symphonys.getInt("pointAddComment");
 
     /**
      * Transfer sum - Add Self Article Comment.
@@ -319,6 +320,46 @@ public final class Pointtransfer {
      * Transfer type - Activity - Eating Snake Income.
      */
     public static final int TRANSFER_TYPE_C_ACTIVITY_EATINGSNAKE_COLLECT = 27;
+
+    /**
+     * Transfer type - Invitation link Used.
+     */
+    public static final int TRANSFER_TYPE_C_INVITATION_LINK_USED = 28; // just a placeholder at present
+
+    /**
+     * Transfer type - Perfect Article.
+     */
+    public static final int TRANSFER_TYPE_C_PERFECT_ARTICLE = 29;
+
+    /**
+     * Transfer sum - Perfect Article.
+     */
+    public static final int TRANSFER_SUM_C_PERFECT_ARTICLE = Symphonys.getInt("pointPerfectArticle");
+
+    /**
+     * Transfer type - Activity - Gobang.
+     */
+    public static final int TRANSFER_TYPE_C_ACTIVITY_GOBANG = 30;
+
+    /**
+     * Transfer type - Activity - Gobang Income.
+     */
+    public static final int TRANSFER_TYPE_C_ACTIVITY_GOBANG_COLLECT = 31;
+
+    /**
+     * Transfer sum - Activity - Start Gobang.
+     */
+    public static final int TRANSFER_SUM_C_ACTIVITY_GOBANG_START = Symphonys.getInt("pointActivityGobang");
+
+    /**
+     * Transfer type - Update Comment Outcome.
+     */
+    public static final int TRANSFER_TYPE_C_UPDATE_COMMENT = 32;
+
+    /**
+     * Transfer sum - Update Comment.
+     */
+    public static final int TRANSFER_SUM_C_UPDATE_COMMENT = Symphonys.getInt("pointUpdateComment");
 
     /**
      * Private constructor.

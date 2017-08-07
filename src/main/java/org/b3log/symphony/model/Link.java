@@ -1,6 +1,6 @@
 /*
  * Symphony - A modern community (forum/SNS/blog) platform written in Java.
- * Copyright (C) 2012-2016,  b3log.org & hacpai.com
+ * Copyright (C) 2012-2017,  b3log.org & hacpai.com
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,11 +17,17 @@
  */
 package org.b3log.symphony.model;
 
+import org.apache.commons.lang.StringUtils;
+
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+
 /**
  * This class defines all link model relevant keys.
  *
  * @author <a href="http://88250.b3log.org">Liang Ding</a>
- * @version 1.0.0.0, Sep 7, 2016
+ * @version 1.3.0.5, Jun 28, 2017
  * @since 1.6.0
  */
 public final class Link {
@@ -81,6 +87,16 @@ public final class Link {
      */
     public static final String LINK_SCORE = "linkScore";
 
+    /**
+     * Key of link ping count.
+     */
+    public static final String LINK_PING_CNT = "linkPingCnt";
+
+    /**
+     * Key of link ping error count.
+     */
+    public static final String LINK_PING_ERR_CNT = "linkPingErrCnt";
+
     //// Transient ////
     /**
      * Key of link id.
@@ -107,15 +123,38 @@ public final class Link {
      */
     public static final String LINK_T_COUNT = "linkCnt";
 
-    //// Type constants
+    // Type constants
     /**
      * Link type - forge.
      */
     public static final int LINK_TYPE_C_FORGE = 0;
 
+    // Address constants
+    /**
+     * Link blacklist.
+     */
+    public static final Set<String> LINK_ADDR_C_BLACKLIST = new HashSet<>(Arrays.asList(
+            "hacpai"));
+
     /**
      * Private constructor.
      */
     private Link() {
+    }
+
+    /**
+     * Checks whether the specified link address in blacklist.
+     *
+     * @param linkAddr the specified link address
+     * @return {@code true} if it in blacklist, otherwise returns {@code false}
+     */
+    public static final boolean inAddrBlacklist(final String linkAddr) {
+        for (final String site : LINK_ADDR_C_BLACKLIST) {
+            if (StringUtils.containsIgnoreCase(linkAddr, site)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

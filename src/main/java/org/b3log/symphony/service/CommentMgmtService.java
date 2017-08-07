@@ -1,6 +1,6 @@
 /*
  * Symphony - A modern community (forum/SNS/blog) platform written in Java.
- * Copyright (C) 2012-2016,  b3log.org & hacpai.com
+ * Copyright (C) 2012-2017,  b3log.org & hacpai.com
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,16 +17,14 @@
  */
 package org.b3log.symphony.service;
 
-import java.util.List;
-import javax.inject.Inject;
 import org.apache.commons.lang.StringUtils;
 import org.b3log.latke.Keys;
 import org.b3log.latke.event.Event;
 import org.b3log.latke.event.EventException;
 import org.b3log.latke.event.EventManager;
+import org.b3log.latke.ioc.inject.Inject;
 import org.b3log.latke.logging.Level;
 import org.b3log.latke.logging.Logger;
-import org.b3log.latke.model.Role;
 import org.b3log.latke.model.User;
 import org.b3log.latke.repository.RepositoryException;
 import org.b3log.latke.repository.Transaction;
@@ -36,32 +34,20 @@ import org.b3log.latke.service.ServiceException;
 import org.b3log.latke.service.annotation.Service;
 import org.b3log.latke.util.Ids;
 import org.b3log.symphony.event.EventTypes;
-import org.b3log.symphony.model.Article;
-import org.b3log.symphony.model.Comment;
-import org.b3log.symphony.model.Common;
-import org.b3log.symphony.model.Liveness;
-import org.b3log.symphony.model.Notification;
-import org.b3log.symphony.model.Option;
-import org.b3log.symphony.model.Pointtransfer;
-import org.b3log.symphony.model.Reward;
-import org.b3log.symphony.model.Tag;
-import org.b3log.symphony.model.UserExt;
-import org.b3log.symphony.repository.ArticleRepository;
-import org.b3log.symphony.repository.CommentRepository;
-import org.b3log.symphony.repository.NotificationRepository;
-import org.b3log.symphony.repository.OptionRepository;
-import org.b3log.symphony.repository.TagArticleRepository;
-import org.b3log.symphony.repository.TagRepository;
-import org.b3log.symphony.repository.UserRepository;
+import org.b3log.symphony.model.*;
+import org.b3log.symphony.repository.*;
 import org.b3log.symphony.util.Emotions;
 import org.b3log.symphony.util.Symphonys;
 import org.json.JSONObject;
+
+import java.util.List;
+import java.util.Locale;
 
 /**
  * Comment management service.
  *
  * @author <a href="http://88250.b3log.org">Liang Ding</a>
- * @version 2.12.7.18, Oct 11, 2016
+ * @version 2.13.11.20, May 8, 2017
  * @since 0.2.0
  */
 @Service
@@ -70,7 +56,13 @@ public class CommentMgmtService {
     /**
      * Logger.
      */
-    private static final Logger LOGGER = Logger.getLogger(CommentMgmtService.class.getName());
+    private static final Logger LOGGER = Logger.getLogger(CommentMgmtService.class);
+
+    /**
+     * Revision repository.
+     */
+    @Inject
+    private RevisionRepository revisionRepository;
 
     /**
      * Comment repository.
@@ -157,35 +149,60 @@ public class CommentMgmtService {
     private LivenessMgmtService livenessMgmtService;
 
     /**
-     * Removes a comment specified with the given comment id.
+     * Removes a comment specified with the given comemnt id. A comemnt is removable if:
+     * <ul>
+     * <li>No replies</li>
+     * <li>No ups, downs</li>
+     * <li>No thanks</li>
+     * </ul>
+     * Sees https://github.com/b3log/symphony/issues/451 for more details.
+     *
+     * @param commentId the given commentId id
+     * @throws ServiceException service exception
+     */
+    public void removeComment(final String commentId) throws ServiceException {
+        JSONObject comment = null;
+
+        try {
+            comment = commentRepository.get(commentId);
+        } catch (final Exception e) {
+            LOGGER.log(Level.ERROR, "Gets a comment [id=" + commentId + "] failed", e);
+        }
+
+        if (null == comment) {
+            return;
+        }
+
+        final int replyCnt = comment.optInt(Comment.COMMENT_REPLY_CNT);
+        if (replyCnt > 0) {
+            throw new ServiceException(langPropsService.get("removeCommentFoundReplyLabel"));
+        }
+
+        final int ups = comment.optInt(Comment.COMMENT_GOOD_CNT);
+        final int downs = comment.optInt(Comment.COMMENT_BAD_CNT);
+        if (ups > 0 || downs > 0) {
+            throw new ServiceException("removeCommentFoundWatchEtcLabel");
+        }
+
+        final int thankCnt = (int) rewardQueryService.rewardedCount(commentId, Reward.TYPE_C_COMMENT);
+        if (thankCnt > 0) {
+            throw new ServiceException("removeCommentFoundThankLabel");
+        }
+
+        // Perform removal
+        removeCommentByAdmin(commentId);
+    }
+
+    /**
+     * Removes a comment specified with the given comment id. Calls this method will remove all existed data related
+     * with the specified comment forcibly.
      *
      * @param commentId the given comment id
      */
     @Transactional
-    public void removeComment(final String commentId) {
+    public void removeCommentByAdmin(final String commentId) {
         try {
-            final JSONObject comment = commentRepository.get(commentId);
-            if (null == comment) {
-                return;
-            }
-
-            final String articleId = comment.optString(Comment.COMMENT_ON_ARTICLE_ID);
-            final JSONObject article = articleRepository.get(articleId);
-            article.put(Article.ARTICLE_COMMENT_CNT, article.optInt(Article.ARTICLE_COMMENT_CNT) - 1);
-            articleRepository.update(articleId, article);
-
-            final String commentAuthorId = comment.optString(Comment.COMMENT_AUTHOR_ID);
-            final JSONObject commenter = userRepository.get(commentAuthorId);
-            commenter.put(UserExt.USER_COMMENT_COUNT, commenter.optInt(UserExt.USER_COMMENT_COUNT) - 1);
-            userRepository.update(commentAuthorId, commenter);
-
-            commentRepository.remove(comment.optString(Keys.OBJECT_ID));
-
-            final JSONObject commentCntOption = optionRepository.get(Option.ID_C_STATISTIC_CMT_COUNT);
-            commentCntOption.put(Option.OPTION_VALUE, commentCntOption.optInt(Option.OPTION_VALUE) - 1);
-            optionRepository.update(Option.ID_C_STATISTIC_CMT_COUNT, commentCntOption);
-
-            notificationRepository.removeByDataId(commentId);
+            commentRepository.removeComment(commentId);
         } catch (final Exception e) {
             LOGGER.log(Level.ERROR, "Removes a comment error [id=" + commentId + "]", e);
         }
@@ -195,7 +212,7 @@ public class CommentMgmtService {
      * A user specified by the given sender id thanks the author of a comment specified by the given comment id.
      *
      * @param commentId the given comment id
-     * @param senderId the given sender id
+     * @param senderId  the given sender id
      * @throws ServiceException service exception
      */
     public void thankComment(final String commentId, final String senderId) throws ServiceException {
@@ -275,25 +292,21 @@ public class CommentMgmtService {
     /**
      * Adds a comment with the specified request json object.
      *
-     * @param requestJSONObject the specified request json object, for example,      <pre>
-     * {
-     *     "commentContent": "",
-     *     "commentAuthorId": "",
-     *     "commentAuthorEmail": "",
-     *     "commentOnArticleId": "",
-     *     "commentOriginalCommentId": "", // optional
-     *     "clientCommentId": "" // optional,
-     *     "commentAuthorName": "" // If from client
-     *     "commenter": {
-     *         // User model
-     *     },
-     *     "commentIP": "", // optional, default to ""
-     *     "commentUA": "", // optional, default to ""
-     *     "commentAnonymous": int, // optional, default to 0 (public)
-     *     "userCommentViewMode": int
-     * }
-     * </pre>, see {@link Comment} for more details
-     *
+     * @param requestJSONObject the specified request json object, for example,
+     *                          "commentContent": "",
+     *                          "commentAuthorId": "",
+     *                          "commentOnArticleId": "",
+     *                          "commentOriginalCommentId": "", // optional
+     *                          "clientCommentId": "" // optional,
+     *                          "commentAuthorName": "" // If from client
+     *                          "commenter": {
+     *                          // User model
+     *                          },
+     *                          "commentIP": "", // optional, default to ""
+     *                          "commentUA": "", // optional, default to ""
+     *                          "commentAnonymous": int, // optional, default to 0 (public)
+     *                          "userCommentViewMode": int
+     *                          , see {@link Comment} for more details
      * @return generated comment id
      * @throws ServiceException service exception
      */
@@ -309,7 +322,7 @@ public class CommentMgmtService {
         final int commentViewMode = requestJSONObject.optInt(UserExt.USER_COMMENT_VIEW_MODE);
 
         if (currentTimeMillis - commenter.optLong(UserExt.USER_LATEST_CMT_TIME) < Symphonys.getLong("minStepCmtTime")
-                && !Role.ADMIN_ROLE.equals(commenter.optString(User.USER_ROLE))
+                && !Role.ROLE_ID_C_ADMIN.equals(commenter.optString(User.USER_ROLE))
                 && !UserExt.DEFAULT_CMTER_ROLE.equals(commenter.optString(User.USER_ROLE))) {
             LOGGER.log(Level.WARN, "Adds comment too frequent [userName={0}]", commenter.optString(User.USER_NAME));
             throw new ServiceException(langPropsService.get("tooFrequentCmtLabel"));
@@ -317,7 +330,7 @@ public class CommentMgmtService {
 
         final String commenterName = commenter.optString(User.USER_NAME);
 
-        JSONObject article = null;
+        JSONObject article;
         try {
             // check if admin allow to add comment
             final JSONObject option = optionRepository.get(Option.ID_C_MISC_ALLOW_ADD_COMMENT);
@@ -376,7 +389,6 @@ public class CommentMgmtService {
             String content = requestJSONObject.optString(Comment.COMMENT_CONTENT).
                     replace("_esc_enter_88250_", "<br/>"); // Solo client escape
 
-            comment.put(Comment.COMMENT_AUTHOR_EMAIL, requestJSONObject.optString(Comment.COMMENT_AUTHOR_EMAIL));
             comment.put(Comment.COMMENT_AUTHOR_ID, commentAuthorId);
             comment.put(Comment.COMMENT_ON_ARTICLE_ID, articleId);
             if (fromClient) {
@@ -398,6 +410,10 @@ public class CommentMgmtService {
             }
 
             content = Emotions.toAliases(content);
+            content = content.replaceAll("\\s+$", ""); // https://github.com/b3log/symphony/issues/389
+            content += " "; // in case of tailing @user
+            content = content.replace(langPropsService.get("uploadingLabel", Locale.SIMPLIFIED_CHINESE), "");
+            content = content.replace(langPropsService.get("uploadingLabel", Locale.US), "");
 
             comment.put(Comment.COMMENT_CONTENT, content);
             comment.put(Comment.COMMENT_CREATE_TIME, System.currentTimeMillis());
@@ -440,6 +456,7 @@ public class CommentMgmtService {
             comment.put(Comment.COMMENT_BAD_CNT, 0);
             comment.put(Comment.COMMENT_SCORE, 0D);
             comment.put(Comment.COMMENT_REPLY_CNT, 0);
+            comment.put(Comment.COMMENT_AUDIO_URL, "");
 
             // Adds the comment
             final String commentId = commentRepository.add(comment);
@@ -452,6 +469,19 @@ public class CommentMgmtService {
 
                 tagArticleRepository.update(tagArticleRel.optString(Keys.OBJECT_ID), tagArticleRel);
             }
+
+            // Revision
+            final JSONObject revision = new JSONObject();
+            revision.put(Revision.REVISION_AUTHOR_ID, comment.optString(Comment.COMMENT_AUTHOR_ID));
+
+            final JSONObject revisionData = new JSONObject();
+            revisionData.put(Comment.COMMENT_CONTENT, content);
+
+            revision.put(Revision.REVISION_DATA, revisionData.toString());
+            revision.put(Revision.REVISION_DATA_ID, commentId);
+            revision.put(Revision.REVISION_DATA_TYPE, Revision.DATA_TYPE_C_COMMENT);
+
+            revisionRepository.add(revision);
 
             transaction.commit();
 
@@ -501,20 +531,72 @@ public class CommentMgmtService {
      * Updates the specified comment by the given comment id.
      *
      * @param commentId the given comment id
-     * @param comment the specified comment
+     * @param comment   the specified comment
      * @throws ServiceException service exception
      */
     public void updateComment(final String commentId, final JSONObject comment) throws ServiceException {
         final Transaction transaction = commentRepository.beginTransaction();
 
         try {
+            final JSONObject oldComment = commentRepository.get(commentId);
+            final String oldContent = oldComment.optString(Comment.COMMENT_CONTENT);
+
             String content = comment.optString(Comment.COMMENT_CONTENT);
             content = Emotions.toAliases(content);
+            content = content.replaceAll("\\s+$", ""); // https://github.com/b3log/symphony/issues/389
+            content += " "; // in case of tailing @user
+            content = content.replace(langPropsService.get("uploadingLabel", Locale.SIMPLIFIED_CHINESE), "");
+            content = content.replace(langPropsService.get("uploadingLabel", Locale.US), "");
             comment.put(Comment.COMMENT_CONTENT, content);
 
             commentRepository.update(commentId, comment);
 
+            final String commentAuthorId = comment.optString(Comment.COMMENT_AUTHOR_ID);
+            if (!oldContent.equals(content)) {
+                // Revision
+                final JSONObject revision = new JSONObject();
+                revision.put(Revision.REVISION_AUTHOR_ID, commentAuthorId);
+
+                final JSONObject revisionData = new JSONObject();
+                revisionData.put(Comment.COMMENT_CONTENT, content);
+
+                revision.put(Revision.REVISION_DATA, revisionData.toString());
+                revision.put(Revision.REVISION_DATA_ID, commentId);
+                revision.put(Revision.REVISION_DATA_TYPE, Revision.DATA_TYPE_C_COMMENT);
+
+                revisionRepository.add(revision);
+            }
+
             transaction.commit();
+
+            final JSONObject article = articleRepository.get(comment.optString(Comment.COMMENT_ON_ARTICLE_ID));
+            final int articleAnonymous = article.optInt(Article.ARTICLE_ANONYMOUS);
+            final int commentAnonymous = comment.optInt(Comment.COMMENT_ANONYMOUS);
+
+            if (Comment.COMMENT_ANONYMOUS_C_PUBLIC == commentAnonymous
+                    && Article.ARTICLE_ANONYMOUS_C_PUBLIC == articleAnonymous) {
+                // Point
+                final long now = System.currentTimeMillis();
+                final long createTime = comment.optLong(Keys.OBJECT_ID);
+                if (now - createTime > 1000 * 60 * 5) {
+                    pointtransferMgmtService.transfer(commentAuthorId, Pointtransfer.ID_C_SYS,
+                            Pointtransfer.TRANSFER_TYPE_C_UPDATE_COMMENT,
+                            Pointtransfer.TRANSFER_SUM_C_UPDATE_COMMENT, commentId, now);
+                }
+            }
+
+            final boolean fromClient = comment.has(Comment.COMMENT_CLIENT_COMMENT_ID);
+
+            // Event
+            final JSONObject eventData = new JSONObject();
+            eventData.put(Common.FROM_CLIENT, fromClient);
+            eventData.put(Article.ARTICLE, article);
+            eventData.put(Comment.COMMENT, comment);
+            try {
+                eventManager.fireEventAsynchronously(new Event<>(EventTypes.UPDATE_COMMENT, eventData));
+            } catch (final EventException e) {
+                LOGGER.log(Level.ERROR, e.getMessage(), e);
+            }
         } catch (final RepositoryException e) {
             if (transaction.isActive()) {
                 transaction.rollback();

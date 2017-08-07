@@ -1,6 +1,6 @@
 /*
  * Symphony - A modern community (forum/SNS/blog) platform written in Java.
- * Copyright (C) 2012-2016,  b3log.org & hacpai.com
+ * Copyright (C) 2012-2017,  b3log.org & hacpai.com
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,10 +21,60 @@ package org.b3log.symphony.model;
  * This class defines all common model relevant keys.
  *
  * @author <a href="http://88250.b3log.org">Liang Ding</a>
- * @version 1.50.1.11, Nov 16, 2016
+ * @version 1.62.1.12, Jul 3, 2017
  * @since 0.2.0
  */
 public final class Common {
+
+    /**
+     * Key of command.
+     */
+    public static final String CMD = "cmd";
+
+    /**
+     * Key of User-Agent.
+     */
+    public static final String USER_AGENT = "User-Agent";
+
+    /**
+     * Key of add article domains.
+     */
+    public static final String ADD_ARTICLE_DOMAINS = "addArticleDomains";
+
+    /**
+     * Key of data.
+     */
+    public static final String DATA = "data";
+
+    /**
+     * Key of ISBN.
+     */
+    public static final String ISBN = "ISBN";
+
+    /**
+     * Key of mans.
+     */
+    public static final String MANS = "mans";
+
+    /**
+     * Key of man HTML.
+     */
+    public static final String MAN_HTML = "manHTML";
+
+    /**
+     * Key of man command.
+     */
+    public static final String MAN_CMD = "manCmd";
+
+    /**
+     * Key of requisite.
+     */
+    public static final String REQUISITE = "requisite";
+
+    /**
+     * Key of requisite message.
+     */
+    public static final String REQUISITE_MSG = "requisiteMsg";
 
     /**
      * Key of following user articles.
@@ -120,6 +170,11 @@ public final class Common {
      * Key of unread 'sys announce' notifications count.
      */
     public static final String UNREAD_SYS_ANNOUNCE_NOTIFICATION_CNT = "unreadSysAnnounceNotificationCnt";
+
+    /**
+     * Key of unread 'new follower' notifications count.
+     */
+    public static final String UNREAD_NEW_FOLLOWER_NOTIFICATION_CNT = "unreadNewFollowerNotificationCnt";
 
     /**
      * Key of mouse effects.
@@ -377,6 +432,11 @@ public final class Common {
     public static final String IS_FOLLOWING = "isFollowing";
 
     /**
+     * Key of is watching.
+     */
+    public static final String IS_WATCHING = "isWatching";
+
+    /**
      * Key of is my article.
      */
     public static final String IS_MY_ARTICLE = "isMyArticle";
@@ -582,9 +642,9 @@ public final class Common {
     public static final String UNREAD_AT_NOTIFICATION_CNT = "unreadAtNotificationCnt";
 
     /**
-     * Key of 'followingUser' notifications.
+     * Key of 'following' notifications.
      */
-    public static final String FOLLOWING_USER_NOTIFICATIONS = "followingUserNotifications";
+    public static final String FOLLOWING_NOTIFICATIONS = "followingNotifications";
 
     /**
      * Key of unread 'broadcast' notifications count.
@@ -597,9 +657,9 @@ public final class Common {
     public static final String BROADCAST_NOTIFICATIONS = "broadcastNotifications";
 
     /**
-     * Key of unread 'followingUser' notifications count.
+     * Key of unread 'following' notifications count.
      */
-    public static final String UNREAD_FOLLOWING_USER_NOTIFICATION_CNT = "unreadFollowingUserNotificationCnt";
+    public static final String UNREAD_FOLLOWING_NOTIFICATION_CNT = "unreadFollowingNotificationCnt";
 
     /**
      * Key of follower user count.
@@ -635,6 +695,11 @@ public final class Common {
      * Key of author URL.
      */
     public static final String AUTHOR_URL = "authorURL";
+
+    /**
+     * Key of author avatar URL.
+     */
+    public static final String AUTHOR_AVATAR_URL = "authorAvatarURL";
 
     /**
      * Key of UA.

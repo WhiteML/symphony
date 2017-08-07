@@ -1,6 +1,6 @@
 /*
  * Symphony - A modern community (forum/SNS/blog) platform written in Java.
- * Copyright (C) 2012-2016,  b3log.org & hacpai.com
+ * Copyright (C) 2012-2017,  b3log.org & hacpai.com
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,15 +17,11 @@
  */
 package org.b3log.symphony.processor;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import javax.inject.Inject;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.lang.StringUtils;
+import org.b3log.latke.ioc.inject.Inject;
 import org.b3log.latke.logging.Logger;
 import org.b3log.latke.model.Pagination;
+import org.b3log.latke.service.LangPropsService;
 import org.b3log.latke.servlet.HTTPRequestContext;
 import org.b3log.latke.servlet.HTTPRequestMethod;
 import org.b3log.latke.servlet.annotation.After;
@@ -39,25 +35,31 @@ import org.b3log.symphony.model.Article;
 import org.b3log.symphony.model.Common;
 import org.b3log.symphony.model.UserExt;
 import org.b3log.symphony.processor.advice.AnonymousViewCheck;
+import org.b3log.symphony.processor.advice.PermissionGrant;
 import org.b3log.symphony.processor.advice.stopwatch.StopwatchEndAdvice;
 import org.b3log.symphony.processor.advice.stopwatch.StopwatchStartAdvice;
 import org.b3log.symphony.service.ArticleQueryService;
+import org.b3log.symphony.service.DataModelService;
 import org.b3log.symphony.service.SearchQueryService;
 import org.b3log.symphony.service.UserQueryService;
-import org.b3log.symphony.util.Filler;
 import org.b3log.symphony.util.Symphonys;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
 /**
  * Search processor.
- *
  * <ul>
  * <li>Searches keyword (/search), GET</li>
  * </ul>
  *
  * @author <a href="http://88250.b3log.org">Liang Ding</a>
- * @version 1.1.0.3, Oct 26, 2016
+ * @version 1.1.2.4, Mar 29, 2017
  * @since 1.4.0
  */
 @RequestProcessor
@@ -66,7 +68,7 @@ public class SearchProcessor {
     /**
      * Logger.
      */
-    private static final Logger LOGGER = Logger.getLogger(SearchProcessor.class.getName());
+    private static final Logger LOGGER = Logger.getLogger(SearchProcessor.class);
 
     /**
      * Search query service.
@@ -87,22 +89,28 @@ public class SearchProcessor {
     private UserQueryService userQueryService;
 
     /**
-     * Filler.
+     * Data model service.
      */
     @Inject
-    private Filler filler;
+    private DataModelService dataModelService;
+
+    /**
+     * Language service.
+     */
+    @Inject
+    private LangPropsService langPropsService;
 
     /**
      * Searches.
      *
-     * @param context the specified context
-     * @param request the specified request
+     * @param context  the specified context
+     * @param request  the specified request
      * @param response the specified response
      * @throws Exception exception
      */
     @RequestProcessing(value = "/search", method = HTTPRequestMethod.GET)
     @Before(adviceClass = {StopwatchStartAdvice.class, AnonymousViewCheck.class})
-    @After(adviceClass = StopwatchEndAdvice.class)
+    @After(adviceClass = {PermissionGrant.class, StopwatchEndAdvice.class})
     public void search(final HTTPRequestContext context, final HttpServletRequest request, final HttpServletResponse response)
             throws Exception {
         final AbstractFreeMarkerRenderer renderer = new SkinRenderer(request);
@@ -118,7 +126,11 @@ public class SearchProcessor {
 
         final Map<String, Object> dataModel = renderer.getDataModel();
 
-        final String keyword = request.getParameter("key");
+        String keyword = request.getParameter("key");
+        if (StringUtils.isBlank(keyword)) {
+            keyword = "";
+        }
+
         dataModel.put(Common.KEY, keyword);
 
         final String p = request.getParameter("p");
@@ -132,7 +144,7 @@ public class SearchProcessor {
         if (null != user) {
             pageSize = user.optInt(UserExt.USER_LIST_PAGE_SIZE);
         }
-        final List<JSONObject> articles = new ArrayList<JSONObject>();
+        final List<JSONObject> articles = new ArrayList<>();
         int total = 0;
 
         if (Symphonys.getBoolean("es.enabled")) {
@@ -170,6 +182,9 @@ public class SearchProcessor {
             }
 
             total = result.optInt("nbHits");
+            if (total > 1000) {
+                total = 1000; // Algolia limits the maximum number of search results to 1000
+            }
         }
 
         final int avatarViewMode = (int) request.getAttribute(UserExt.USER_AVATAR_VIEW_MODE);
@@ -191,10 +206,14 @@ public class SearchProcessor {
         dataModel.put(Pagination.PAGINATION_PAGE_COUNT, pageCount);
         dataModel.put(Pagination.PAGINATION_PAGE_NUMS, pageNums);
 
-        filler.fillHeaderAndFooter(request, response, dataModel);
-        filler.fillRandomArticles(avatarViewMode, dataModel);
-        filler.fillSideHotArticles(avatarViewMode, dataModel);
-        filler.fillSideTags(dataModel);
-        filler.fillLatestCmts(dataModel);
+        dataModelService.fillHeaderAndFooter(request, response, dataModel);
+        dataModelService.fillRandomArticles(avatarViewMode, dataModel);
+        dataModelService.fillSideHotArticles(avatarViewMode, dataModel);
+        dataModelService.fillSideTags(dataModel);
+        dataModelService.fillLatestCmts(dataModel);
+
+        String searchEmptyLabel = langPropsService.get("searchEmptyLabel");
+        searchEmptyLabel = searchEmptyLabel.replace("${key}", keyword);
+        dataModel.put("searchEmptyLabel", searchEmptyLabel);
     }
 }

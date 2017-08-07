@@ -1,6 +1,6 @@
 /*
  * Symphony - A modern community (forum/SNS/blog) platform written in Java.
- * Copyright (C) 2012-2016,  b3log.org & hacpai.com
+ * Copyright (C) 2012-2017,  b3log.org & hacpai.com
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,12 +17,10 @@
  */
 package org.b3log.symphony.service;
 
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import javax.inject.Inject;
 import org.apache.commons.lang.StringUtils;
 import org.b3log.latke.Keys;
 import org.b3log.latke.Latkes;
+import org.b3log.latke.ioc.inject.Inject;
 import org.b3log.latke.logging.Level;
 import org.b3log.latke.logging.Logger;
 import org.b3log.latke.repository.FilterOperator;
@@ -38,11 +36,15 @@ import org.b3log.symphony.repository.TagRepository;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 /**
  * Short link query service.
  *
  * @author <a href="http://88250.b3log.org">Liang Ding</a>
- * @version 1.1.5.1, May 10, 2016
+ * @author <a href="http://vanessa.b3log.org">Liyuan Li</a>
+ * @version 1.2.0.0, May 20, 2017
  * @since 1.3.0
  */
 @Service
@@ -51,7 +53,7 @@ public class ShortLinkQueryService {
     /**
      * Logger.
      */
-    private static final Logger LOGGER = Logger.getLogger(ShortLinkQueryService.class.getName());
+    private static final Logger LOGGER = Logger.getLogger(ShortLinkQueryService.class);
 
     /**
      * Article pattern - simple.
@@ -168,7 +170,12 @@ public class ShortLinkQueryService {
                 while (matcher.find()) {
                     final String linkTagTitle = StringUtils.substringBetween(matcher.group(), "[", "]");
 
+                    if (StringUtils.equals(linkTagTitle, "x")) { // [x] => <input checked>
+                        continue;
+                    }
+
                     final Query query = new Query().addProjection(Tag.TAG_TITLE, String.class)
+                            .addProjection(Tag.TAG_URI, String.class)
                             .setFilter(new PropertyFilter(Tag.TAG_TITLE, FilterOperator.EQUAL, linkTagTitle));
                     final JSONArray results = tagRepository.get(query).optJSONArray(Keys.RESULTS);
                     if (0 == results.length()) {
@@ -178,7 +185,8 @@ public class ShortLinkQueryService {
                     final JSONObject linkTag = results.optJSONObject(0);
 
                     final String linkTitle = linkTag.optString(Tag.TAG_TITLE);
-                    final String link = " [" + linkTitle + "](" + Latkes.getServePath() + "/tag/" + linkTitle + ") ";
+                    final String linkURI = linkTag.optString(Tag.TAG_URI);
+                    final String link = " [" + linkTitle + "](" + Latkes.getServePath() + "/tag/" + linkURI + ") ";
 
                     matcher.appendReplacement(contentBuilder, link);
                 }

@@ -1,6 +1,6 @@
 /*
  * Symphony - A modern community (forum/SNS/blog) platform written in Java.
- * Copyright (C) 2012-2016,  b3log.org & hacpai.com
+ * Copyright (C) 2012-2017,  b3log.org & hacpai.com
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,22 +17,18 @@
  */
 package org.b3log.symphony.repository;
 
-import java.util.List;
-import javax.inject.Inject;
 import org.b3log.latke.Keys;
-import org.b3log.latke.model.Role;
+import org.b3log.latke.ioc.inject.Inject;
 import org.b3log.latke.model.User;
-import org.b3log.latke.repository.AbstractRepository;
-import org.b3log.latke.repository.FilterOperator;
-import org.b3log.latke.repository.PropertyFilter;
-import org.b3log.latke.repository.Query;
-import org.b3log.latke.repository.RepositoryException;
-import org.b3log.latke.repository.SortDirection;
+import org.b3log.latke.repository.*;
 import org.b3log.latke.repository.annotation.Repository;
 import org.b3log.latke.util.CollectionUtils;
 import org.b3log.symphony.cache.UserCache;
+import org.b3log.symphony.model.Role;
 import org.json.JSONArray;
 import org.json.JSONObject;
+
+import java.util.List;
 
 /**
  * User repository.
@@ -142,7 +138,7 @@ public class UserRepository extends AbstractRepository {
      */
     public List<JSONObject> getAdmins() throws RepositoryException {
         final Query query = new Query().setFilter(
-                new PropertyFilter(User.USER_ROLE, FilterOperator.EQUAL, Role.ADMIN_ROLE)).setPageCount(1)
+                new PropertyFilter(User.USER_ROLE, FilterOperator.EQUAL, Role.ROLE_ID_C_ADMIN)).setPageCount(1)
                 .addSort(Keys.OBJECT_ID, SortDirection.ASCENDING);
         final JSONObject result = get(query);
         final JSONArray array = result.optJSONArray(Keys.RESULTS);
@@ -164,6 +160,6 @@ public class UserRepository extends AbstractRepository {
             return false;
         }
 
-        return Role.ADMIN_ROLE.equals(user.optString(User.USER_ROLE));
+        return Role.ROLE_ID_C_ADMIN.equals(user.optString(User.USER_ROLE));
     }
 }

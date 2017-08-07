@@ -1,6 +1,6 @@
 /*
  * Symphony - A modern community (forum/SNS/blog) platform written in Java.
- * Copyright (C) 2012-2016,  b3log.org & hacpai.com
+ * Copyright (C) 2012-2017,  b3log.org & hacpai.com
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,23 +18,13 @@
 package org.b3log.symphony.processor;
 
 import com.qiniu.util.Auth;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.TimeZone;
-import javax.inject.Inject;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.time.DateFormatUtils;
 import org.b3log.latke.Keys;
+import org.b3log.latke.ioc.inject.Inject;
 import org.b3log.latke.logging.Level;
 import org.b3log.latke.logging.Logger;
 import org.b3log.latke.model.Pagination;
-import org.b3log.latke.model.Role;
 import org.b3log.latke.model.User;
 import org.b3log.latke.service.LangPropsService;
 import org.b3log.latke.service.ServiceException;
@@ -49,59 +39,21 @@ import org.b3log.latke.util.CollectionUtils;
 import org.b3log.latke.util.Paginator;
 import org.b3log.latke.util.Requests;
 import org.b3log.latke.util.Strings;
-import org.b3log.symphony.model.Article;
-import org.b3log.symphony.model.Client;
-import org.b3log.symphony.model.Comment;
-import org.b3log.symphony.model.Common;
-import org.b3log.symphony.model.Emotion;
-import org.b3log.symphony.model.Follow;
-import org.b3log.symphony.model.Invitecode;
-import org.b3log.symphony.model.Notification;
-import org.b3log.symphony.model.Pointtransfer;
-import org.b3log.symphony.model.Tag;
-import org.b3log.symphony.model.UserExt;
-import org.b3log.symphony.processor.advice.AnonymousViewCheck;
-import org.b3log.symphony.processor.advice.CSRFCheck;
-import org.b3log.symphony.processor.advice.CSRFToken;
-import org.b3log.symphony.processor.advice.LoginCheck;
-import org.b3log.symphony.processor.advice.UserBlockCheck;
+import org.b3log.symphony.model.*;
+import org.b3log.symphony.processor.advice.*;
 import org.b3log.symphony.processor.advice.stopwatch.StopwatchEndAdvice;
 import org.b3log.symphony.processor.advice.stopwatch.StopwatchStartAdvice;
-import org.b3log.symphony.processor.advice.validate.PointTransferValidation;
-import org.b3log.symphony.processor.advice.validate.UpdateEmotionListValidation;
-import org.b3log.symphony.processor.advice.validate.UpdatePasswordValidation;
-import org.b3log.symphony.processor.advice.validate.UpdateProfilesValidation;
-import org.b3log.symphony.processor.advice.validate.UpdateSyncB3Validation;
-import org.b3log.symphony.processor.advice.validate.UserRegisterValidation;
-import org.b3log.symphony.service.ArticleQueryService;
-import org.b3log.symphony.service.CommentQueryService;
-import org.b3log.symphony.service.EmotionMgmtService;
-import org.b3log.symphony.service.EmotionQueryService;
-import org.b3log.symphony.service.FollowQueryService;
-import org.b3log.symphony.service.AvatarQueryService;
-import org.b3log.symphony.service.InvitecodeMgmtService;
-import org.b3log.symphony.service.InvitecodeQueryService;
-import org.b3log.symphony.service.LinkForgeQueryService;
-import org.b3log.symphony.service.NotificationMgmtService;
-import org.b3log.symphony.service.OptionQueryService;
-import org.b3log.symphony.service.PointtransferMgmtService;
-import org.b3log.symphony.service.PointtransferQueryService;
-import org.b3log.symphony.service.PostExportService;
-import org.b3log.symphony.service.UserMgmtService;
-import org.b3log.symphony.service.UserQueryService;
-import org.b3log.symphony.util.Filler;
-import org.b3log.symphony.util.Languages;
-import org.b3log.symphony.util.Results;
-import org.b3log.symphony.util.Sessions;
-import org.b3log.symphony.util.Symphonys;
-import org.b3log.symphony.util.TimeZones;
+import org.b3log.symphony.processor.advice.validate.*;
+import org.b3log.symphony.service.*;
+import org.b3log.symphony.util.*;
 import org.json.JSONObject;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.util.*;
 
 /**
  * User processor.
- *
- * <p>
- * For user
  * <ul>
  * <li>User articles (/member/{userName}), GET</li>
  * <li>User comments (/member/{userName}/comments), GET</li>
@@ -122,7 +74,6 @@ import org.json.JSONObject;
  * <li>Updates emotions (/settings/emotionList), POST</li>
  * <li>Password (/settings/password), POST</li>
  * <li>Point buy invitecode (/point/buy-invitecode), POST</li>
- * <li>SyncUser (/apis/user), POST</li>
  * <li>Lists usernames (/users/names), GET</li>
  * <li>Lists emotions (/users/emotions), GET</li>
  * <li>Exports posts(article/comment) to a file (/export/posts), POST</li>
@@ -130,12 +81,11 @@ import org.json.JSONObject;
  * <li>Shows link forge (/member/{userName}/forge/link), GET</li>
  * <li>i18n (/settings/i18n), POST</li>
  * </ul>
- * </p>
  *
  * @author <a href="http://88250.b3log.org">Liang Ding</a>
- * @author Zephyr
+ * @author <a href="http://zephyr.b3log.org">Zephyr</a>
  * @author <a href="http://vanessa.b3log.org">Liyuan Li</a>
- * @version 1.26.13.27, Nov 13, 2016
+ * @version 1.26.21.36, Jul 21, 2017
  * @since 0.2.0
  */
 @RequestProcessor
@@ -144,7 +94,7 @@ public class UserProcessor {
     /**
      * Logger.
      */
-    private static final Logger LOGGER = Logger.getLogger(UserProcessor.class.getName());
+    private static final Logger LOGGER = Logger.getLogger(UserProcessor.class);
 
     /**
      * User management service.
@@ -195,10 +145,10 @@ public class UserProcessor {
     private EmotionMgmtService emotionMgmtService;
 
     /**
-     * Filler.
+     * Data model service.
      */
     @Inject
-    private Filler filler;
+    private DataModelService dataModelService;
 
     /**
      * Avatar query service.
@@ -255,16 +205,22 @@ public class UserProcessor {
     private LinkForgeQueryService linkForgeQueryService;
 
     /**
+     * Role query service.
+     */
+    @Inject
+    private RoleQueryService roleQueryService;
+
+    /**
      * Updates user i18n.
      *
-     * @param context the specified context
-     * @param request the specified request
+     * @param context  the specified context
+     * @param request  the specified request
      * @param response the specified response
      */
     @RequestProcessing(value = "/settings/i18n", method = HTTPRequestMethod.POST)
     @Before(adviceClass = {LoginCheck.class, CSRFCheck.class})
     public void updateI18n(final HTTPRequestContext context,
-            final HttpServletRequest request, final HttpServletResponse response) {
+                           final HttpServletRequest request, final HttpServletResponse response) {
         context.renderJSON();
 
         JSONObject requestJSONObject;
@@ -303,22 +259,22 @@ public class UserProcessor {
     /**
      * Shows user link forge.
      *
-     * @param context the specified context
-     * @param request the specified request
+     * @param context  the specified context
+     * @param request  the specified request
      * @param response the specified response
      * @param userName the specified user name
      * @throws Exception exception
      */
     @RequestProcessing(value = "/member/{userName}/forge/link", method = HTTPRequestMethod.GET)
     @Before(adviceClass = {StopwatchStartAdvice.class, UserBlockCheck.class})
-    @After(adviceClass = StopwatchEndAdvice.class)
+    @After(adviceClass = {PermissionGrant.class, StopwatchEndAdvice.class})
     public void showLinkForge(final HTTPRequestContext context, final HttpServletRequest request,
-            final HttpServletResponse response, final String userName) throws Exception {
+                              final HttpServletResponse response, final String userName) throws Exception {
         final AbstractFreeMarkerRenderer renderer = new SkinRenderer(request);
         context.setRenderer(renderer);
         renderer.setTemplateName("/home/link-forge.ftl");
         final Map<String, Object> dataModel = renderer.getDataModel();
-        filler.fillHeaderAndFooter(request, response, dataModel);
+        dataModelService.fillHeaderAndFooter(request, response, dataModel);
 
         final JSONObject user = (JSONObject) request.getAttribute(User.USER);
         user.put(UserExt.USER_T_CREATE_TIME, new Date(user.getLong(Keys.OBJECT_ID)));
@@ -335,7 +291,7 @@ public class UserProcessor {
             final JSONObject currentUser = (JSONObject) dataModel.get(Common.CURRENT_USER);
             final String followerId = currentUser.optString(Keys.OBJECT_ID);
 
-            final boolean isFollowing = followQueryService.isFollowing(followerId, followingId);
+            final boolean isFollowing = followQueryService.isFollowing(followerId, followingId, Follow.FOLLOWING_TYPE_C_USER);
             dataModel.put(Common.IS_FOLLOWING, isFollowing);
         }
 
@@ -348,8 +304,8 @@ public class UserProcessor {
     /**
      * Queries invitecode state.
      *
-     * @param context the specified context
-     * @param request the specified request
+     * @param context  the specified context
+     * @param request  the specified request
      * @param response the specified response
      * @throws Exception exception
      */
@@ -406,13 +362,13 @@ public class UserProcessor {
     /**
      * Point buy invitecode.
      *
-     * @param context the specified context
-     * @param request the specified request
+     * @param context  the specified context
+     * @param request  the specified request
      * @param response the specified response
      * @throws Exception exception
      */
     @RequestProcessing(value = "/point/buy-invitecode", method = HTTPRequestMethod.POST)
-    @Before(adviceClass = {LoginCheck.class, CSRFCheck.class})
+    @Before(adviceClass = {LoginCheck.class, CSRFCheck.class, PermissionCheck.class})
     public void pointBuy(final HTTPRequestContext context, final HttpServletRequest request, final HttpServletResponse response)
             throws Exception {
         final JSONObject ret = Results.falseResult();
@@ -447,14 +403,14 @@ public class UserProcessor {
     /**
      * Shows settings pages.
      *
-     * @param context the specified context
-     * @param request the specified request
+     * @param context  the specified context
+     * @param request  the specified request
      * @param response the specified response
      * @throws Exception exception
      */
     @RequestProcessing(value = {"/settings", "/settings/*"}, method = HTTPRequestMethod.GET)
     @Before(adviceClass = {StopwatchStartAdvice.class, LoginCheck.class})
-    @After(adviceClass = {CSRFToken.class, StopwatchEndAdvice.class})
+    @After(adviceClass = {CSRFToken.class, PermissionGrant.class, StopwatchEndAdvice.class})
     public void showSettings(final HTTPRequestContext context, final HttpServletRequest request, final HttpServletResponse response)
             throws Exception {
         final AbstractFreeMarkerRenderer renderer = new SkinRenderer(request);
@@ -495,7 +451,7 @@ public class UserProcessor {
         final long fileMaxSize = Symphonys.getLong("upload.file.maxSize");
         dataModel.put("fileMaxSize", fileMaxSize);
 
-        filler.fillHeaderAndFooter(request, response, dataModel);
+        dataModelService.fillHeaderAndFooter(request, response, dataModel);
 
         String inviteTipLabel = (String) dataModel.get("inviteTipLabel");
         inviteTipLabel = inviteTipLabel.replace("{point}", String.valueOf(Pointtransfer.TRANSFER_SUM_C_INVITE_REGISTER));
@@ -532,7 +488,177 @@ public class UserProcessor {
 
         if (requestURI.contains("function")) {
             final String emojis = emotionQueryService.getEmojis(userId);
+            final String[][] emojiLists = {{
+                    "smile",
+                    "laughing",
+                    "smirk",
+                    "heart_eyes",
+                    "kissing_heart",
+                    "flushed",
+                    "grin",
+                    "stuck_out_tongue_closed_eyes",
+                    "kissing",
+                    "sleeping",
+                    "anguished",
+                    "open_mouth",
+                    "expressionless",
+                    "unamused",
+                    "sweat_smile",
+                    "weary",
+                    "sob",
+                    "joy",
+                    "astonished",
+                    "scream"
+            }, {
+                    "tired_face",
+                    "rage",
+                    "triumph",
+                    "yum",
+                    "mask",
+                    "sunglasses",
+                    "dizzy_face",
+                    "imp",
+                    "smiling_imp",
+                    "innocent",
+                    "alien",
+                    "yellow_heart",
+                    "blue_heart",
+                    "purple_heart",
+                    "heart",
+                    "green_heart",
+                    "broken_heart",
+                    "dizzy",
+                    "anger",
+                    "exclamation"
+            }, {
+                    "question",
+                    "zzz",
+                    "notes",
+                    "poop",
+                    "+1",
+                    "-1",
+                    "ok_hand",
+                    "punch",
+                    "v",
+                    "hand",
+                    "point_up",
+                    "point_down",
+                    "pray",
+                    "clap",
+                    "muscle",
+                    "ok_woman",
+                    "no_good",
+                    "raising_hand",
+                    "massage",
+                    "haircut"
+            }, {
+                    "nail_care",
+                    "see_no_evil",
+                    "feet",
+                    "kiss",
+                    "eyes",
+                    "trollface",
+                    "snowman",
+                    "zap",
+                    "cat",
+                    "dog",
+                    "mouse",
+                    "hamster",
+                    "rabbit",
+                    "frog",
+                    "koala",
+                    "pig",
+                    "monkey",
+                    "racehorse",
+                    "camel",
+                    "sheep"
+            }, {
+                    "elephant",
+                    "panda_face",
+                    "snake",
+                    "hatched_chick",
+                    "hatching_chick",
+                    "turtle",
+                    "bug",
+                    "honeybee",
+                    "beetle",
+                    "snail",
+                    "octopus",
+                    "whale",
+                    "dolphin",
+                    "dragon",
+                    "goat",
+                    "paw_prints",
+                    "tulip",
+                    "four_leaf_clover",
+                    "rose",
+                    "mushroom"
+            }, {
+                    "seedling",
+                    "shell",
+                    "crescent_moon",
+                    "partly_sunny",
+                    "octocat",
+                    "jack_o_lantern",
+                    "ghost",
+                    "santa",
+                    "tada",
+                    "camera",
+                    "loudspeaker",
+                    "hourglass",
+                    "lock",
+                    "key",
+                    "bulb",
+                    "hammer",
+                    "moneybag",
+                    "smoking",
+                    "bomb",
+                    "gun"
+            }, {
+                    "hocho",
+                    "pill",
+                    "syringe",
+                    "scissors",
+                    "swimmer",
+                    "black_joker",
+                    "coffee",
+                    "tea",
+                    "sake",
+                    "beer",
+                    "wine_glass",
+                    "pizza",
+                    "hamburger",
+                    "poultry_leg",
+                    "meat_on_bone",
+                    "dango",
+                    "doughnut",
+                    "icecream",
+                    "shaved_ice",
+                    "cake"
+            }, {
+                    "cookie",
+                    "lollipop",
+                    "apple",
+                    "green_apple",
+                    "tangerine",
+                    "lemon",
+                    "cherries",
+                    "grapes",
+                    "watermelon",
+                    "strawberry",
+                    "peach",
+                    "melon",
+                    "banana",
+                    "pear",
+                    "pineapple",
+                    "sweet_potato",
+                    "eggplant",
+                    "tomato",
+                    Emotion.EOF_EMOJI // 标记结束以便在function.ftl中处理
+            }};
+
             dataModel.put(Emotion.EMOTIONS, emojis);
+            dataModel.put(Emotion.SHORT_T_LIST, emojiLists);
         }
 
         if (requestURI.contains("i18n")) {
@@ -557,22 +683,22 @@ public class UserProcessor {
     /**
      * Shows user home anonymous comments page.
      *
-     * @param context the specified context
-     * @param request the specified request
+     * @param context  the specified context
+     * @param request  the specified request
      * @param response the specified response
      * @param userName the specified user name
      * @throws Exception exception
      */
     @RequestProcessing(value = "/member/{userName}/comments/anonymous", method = HTTPRequestMethod.GET)
     @Before(adviceClass = {StopwatchStartAdvice.class, UserBlockCheck.class})
-    @After(adviceClass = StopwatchEndAdvice.class)
+    @After(adviceClass = {PermissionGrant.class, StopwatchEndAdvice.class})
     public void showHomeAnonymousComments(final HTTPRequestContext context, final HttpServletRequest request,
-            final HttpServletResponse response, final String userName) throws Exception {
+                                          final HttpServletResponse response, final String userName) throws Exception {
         final AbstractFreeMarkerRenderer renderer = new SkinRenderer(request);
         context.setRenderer(renderer);
         renderer.setTemplateName("/home/comments.ftl");
         final Map<String, Object> dataModel = renderer.getDataModel();
-        filler.fillHeaderAndFooter(request, response, dataModel);
+        dataModelService.fillHeaderAndFooter(request, response, dataModel);
 
         final boolean isLoggedIn = (Boolean) dataModel.get(Common.IS_LOGGED_IN);
         JSONObject currentUser = null;
@@ -583,7 +709,7 @@ public class UserProcessor {
         final JSONObject user = (JSONObject) request.getAttribute(User.USER);
 
         if (null == currentUser || (!currentUser.optString(Keys.OBJECT_ID).equals(user.optString(Keys.OBJECT_ID)))
-                && !Role.ADMIN_ROLE.equals(currentUser.optString(User.USER_ROLE))) {
+                && !Role.ROLE_ID_C_ADMIN.equals(currentUser.optString(User.USER_ROLE))) {
             response.sendError(HttpServletResponse.SC_NOT_FOUND);
 
             return;
@@ -611,7 +737,7 @@ public class UserProcessor {
             currentUser = (JSONObject) dataModel.get(Common.CURRENT_USER);
             final String followerId = currentUser.optString(Keys.OBJECT_ID);
 
-            final boolean isFollowing = followQueryService.isFollowing(followerId, followingId);
+            final boolean isFollowing = followQueryService.isFollowing(followerId, followingId, Follow.FOLLOWING_TYPE_C_USER);
             dataModel.put(Common.IS_FOLLOWING, isFollowing);
         }
 
@@ -647,22 +773,22 @@ public class UserProcessor {
     /**
      * Shows user home anonymous articles page.
      *
-     * @param context the specified context
-     * @param request the specified request
+     * @param context  the specified context
+     * @param request  the specified request
      * @param response the specified response
      * @param userName the specified user name
      * @throws Exception exception
      */
     @RequestProcessing(value = "/member/{userName}/articles/anonymous", method = HTTPRequestMethod.GET)
     @Before(adviceClass = {StopwatchStartAdvice.class, UserBlockCheck.class})
-    @After(adviceClass = StopwatchEndAdvice.class)
+    @After(adviceClass = {PermissionGrant.class, StopwatchEndAdvice.class})
     public void showAnonymousArticles(final HTTPRequestContext context, final HttpServletRequest request,
-            final HttpServletResponse response, final String userName) throws Exception {
+                                      final HttpServletResponse response, final String userName) throws Exception {
         final AbstractFreeMarkerRenderer renderer = new SkinRenderer(request);
         context.setRenderer(renderer);
-        renderer.setTemplateName("/home/comments.ftl");
+        renderer.setTemplateName("/home/home.ftl");
         final Map<String, Object> dataModel = renderer.getDataModel();
-        filler.fillHeaderAndFooter(request, response, dataModel);
+        dataModelService.fillHeaderAndFooter(request, response, dataModel);
 
         final boolean isLoggedIn = (Boolean) dataModel.get(Common.IS_LOGGED_IN);
         JSONObject currentUser = null;
@@ -673,7 +799,7 @@ public class UserProcessor {
         final JSONObject user = (JSONObject) request.getAttribute(User.USER);
 
         if (null == currentUser || (!currentUser.optString(Keys.OBJECT_ID).equals(user.optString(Keys.OBJECT_ID)))
-                && !Role.ADMIN_ROLE.equals(currentUser.optString(User.USER_ROLE))) {
+                && !Role.ROLE_ID_C_ADMIN.equals(currentUser.optString(User.USER_ROLE))) {
             response.sendError(HttpServletResponse.SC_NOT_FOUND);
 
             return;
@@ -689,8 +815,6 @@ public class UserProcessor {
         final String followingId = user.optString(Keys.OBJECT_ID);
         dataModel.put(Follow.FOLLOWING_ID, followingId);
 
-        renderer.setTemplateName("/home/home.ftl");
-
         dataModel.put(User.USER, user);
         fillHomeUser(dataModel, user);
 
@@ -700,7 +824,7 @@ public class UserProcessor {
         if (isLoggedIn) {
             final String followerId = currentUser.optString(Keys.OBJECT_ID);
 
-            final boolean isFollowing = followQueryService.isFollowing(followerId, followingId);
+            final boolean isFollowing = followQueryService.isFollowing(followerId, followingId, Follow.FOLLOWING_TYPE_C_USER);
             dataModel.put(Common.IS_FOLLOWING, isFollowing);
         }
 
@@ -765,17 +889,17 @@ public class UserProcessor {
     /**
      * Shows user home page.
      *
-     * @param context the specified context
-     * @param request the specified request
+     * @param context  the specified context
+     * @param request  the specified request
      * @param response the specified response
      * @param userName the specified user name
      * @throws Exception exception
      */
     @RequestProcessing(value = "/member/{userName}", method = HTTPRequestMethod.GET)
     @Before(adviceClass = {StopwatchStartAdvice.class, AnonymousViewCheck.class, UserBlockCheck.class})
-    @After(adviceClass = StopwatchEndAdvice.class)
+    @After(adviceClass = {PermissionGrant.class, StopwatchEndAdvice.class})
     public void showHome(final HTTPRequestContext context, final HttpServletRequest request, final HttpServletResponse response,
-            final String userName) throws Exception {
+                         final String userName) throws Exception {
         final JSONObject user = (JSONObject) request.getAttribute(User.USER);
 
         String pageNumStr = request.getParameter("p");
@@ -783,12 +907,17 @@ public class UserProcessor {
             pageNumStr = "1";
         }
 
-        final int pageNum = Integer.valueOf(pageNumStr);
+        int pageNum = 1;
+        try {
+            pageNum = Integer.valueOf(pageNumStr);
+        } catch (final Exception e) {
+            pageNum = 1;
+        }
 
         final AbstractFreeMarkerRenderer renderer = new SkinRenderer(request);
         context.setRenderer(renderer);
         final Map<String, Object> dataModel = renderer.getDataModel();
-        filler.fillHeaderAndFooter(request, response, dataModel);
+        dataModelService.fillHeaderAndFooter(request, response, dataModel);
 
         final String followingId = user.optString(Keys.OBJECT_ID);
         dataModel.put(Follow.FOLLOWING_ID, followingId);
@@ -806,7 +935,7 @@ public class UserProcessor {
             final JSONObject currentUser = (JSONObject) dataModel.get(Common.CURRENT_USER);
             final String followerId = currentUser.optString(Keys.OBJECT_ID);
 
-            final boolean isFollowing = followQueryService.isFollowing(followerId, followingId);
+            final boolean isFollowing = followQueryService.isFollowing(followerId, followingId, Follow.FOLLOWING_TYPE_C_USER);
             dataModel.put(Common.IS_FOLLOWING, isFollowing);
         }
 
@@ -819,8 +948,13 @@ public class UserProcessor {
                 user.optString(Keys.OBJECT_ID), Article.ARTICLE_ANONYMOUS_C_PUBLIC, pageNum, pageSize);
         dataModel.put(Common.USER_HOME_ARTICLES, userArticles);
 
-        final int articleCnt = user.optInt(UserExt.USER_ARTICLE_COUNT);
-        final int pageCount = (int) Math.ceil((double) articleCnt / (double) pageSize);
+        int recordCount = 0;
+        int pageCount = 0;
+        if (!userArticles.isEmpty()) {
+            final JSONObject first = userArticles.get(0);
+            pageCount = first.optInt(Pagination.PAGINATION_PAGE_COUNT);
+            recordCount = first.optInt(Pagination.PAGINATION_RECORD_COUNT);
+        }
 
         final List<Integer> pageNums = Paginator.paginate(pageNum, pageSize, pageCount, windowSize);
         if (!pageNums.isEmpty()) {
@@ -831,7 +965,7 @@ public class UserProcessor {
         dataModel.put(Pagination.PAGINATION_CURRENT_PAGE_NUM, pageNum);
         dataModel.put(Pagination.PAGINATION_PAGE_COUNT, pageCount);
         dataModel.put(Pagination.PAGINATION_PAGE_NUMS, pageNums);
-        dataModel.put(Pagination.PAGINATION_RECORD_COUNT, articleCnt);
+        dataModel.put(Pagination.PAGINATION_RECORD_COUNT, recordCount);
 
         final JSONObject currentUser = Sessions.currentUser(request);
         if (null == currentUser) {
@@ -846,24 +980,24 @@ public class UserProcessor {
     /**
      * Shows user home comments page.
      *
-     * @param context the specified context
-     * @param request the specified request
+     * @param context  the specified context
+     * @param request  the specified request
      * @param response the specified response
      * @param userName the specified user name
      * @throws Exception exception
      */
     @RequestProcessing(value = "/member/{userName}/comments", method = HTTPRequestMethod.GET)
     @Before(adviceClass = {StopwatchStartAdvice.class, AnonymousViewCheck.class, UserBlockCheck.class})
-    @After(adviceClass = StopwatchEndAdvice.class)
+    @After(adviceClass = {PermissionGrant.class, StopwatchEndAdvice.class})
     public void showHomeComments(final HTTPRequestContext context, final HttpServletRequest request, final HttpServletResponse response,
-            final String userName) throws Exception {
+                                 final String userName) throws Exception {
         final JSONObject user = (JSONObject) request.getAttribute(User.USER);
 
         final AbstractFreeMarkerRenderer renderer = new SkinRenderer(request);
         context.setRenderer(renderer);
         renderer.setTemplateName("/home/comments.ftl");
         final Map<String, Object> dataModel = renderer.getDataModel();
-        filler.fillHeaderAndFooter(request, response, dataModel);
+        dataModelService.fillHeaderAndFooter(request, response, dataModel);
 
         String pageNumStr = request.getParameter("p");
         if (Strings.isEmptyOrNull(pageNumStr) || !Strings.isNumeric(pageNumStr)) {
@@ -889,7 +1023,7 @@ public class UserProcessor {
             currentUser = (JSONObject) dataModel.get(Common.CURRENT_USER);
             final String followerId = currentUser.optString(Keys.OBJECT_ID);
 
-            final boolean isFollowing = followQueryService.isFollowing(followerId, followingId);
+            final boolean isFollowing = followQueryService.isFollowing(followerId, followingId, Follow.FOLLOWING_TYPE_C_USER);
             dataModel.put(Common.IS_FOLLOWING, isFollowing);
         }
 
@@ -899,8 +1033,13 @@ public class UserProcessor {
                 user.optString(Keys.OBJECT_ID), Comment.COMMENT_ANONYMOUS_C_PUBLIC, pageNum, pageSize, currentUser);
         dataModel.put(Common.USER_HOME_COMMENTS, userComments);
 
-        final int commentCnt = user.optInt(UserExt.USER_COMMENT_COUNT);
-        final int pageCount = (int) Math.ceil((double) commentCnt / (double) pageSize);
+        int recordCount = 0;
+        int pageCount = 0;
+        if (!userComments.isEmpty()) {
+            final JSONObject first = userComments.get(0);
+            pageCount = first.optInt(Pagination.PAGINATION_PAGE_COUNT);
+            recordCount = first.optInt(Pagination.PAGINATION_RECORD_COUNT);
+        }
 
         final List<Integer> pageNums = Paginator.paginate(pageNum, pageSize, pageCount, windowSize);
         if (!pageNums.isEmpty()) {
@@ -911,7 +1050,7 @@ public class UserProcessor {
         dataModel.put(Pagination.PAGINATION_CURRENT_PAGE_NUM, pageNum);
         dataModel.put(Pagination.PAGINATION_PAGE_COUNT, pageCount);
         dataModel.put(Pagination.PAGINATION_PAGE_NUMS, pageNums);
-        dataModel.put(Pagination.PAGINATION_RECORD_COUNT, commentCnt);
+        dataModel.put(Pagination.PAGINATION_RECORD_COUNT, recordCount);
 
         dataModel.put(Common.TYPE, "comments");
     }
@@ -919,24 +1058,24 @@ public class UserProcessor {
     /**
      * Shows user home following users page.
      *
-     * @param context the specified context
-     * @param request the specified request
+     * @param context  the specified context
+     * @param request  the specified request
      * @param response the specified response
      * @param userName the specified user name
      * @throws Exception exception
      */
     @RequestProcessing(value = "/member/{userName}/following/users", method = HTTPRequestMethod.GET)
     @Before(adviceClass = {StopwatchStartAdvice.class, AnonymousViewCheck.class, UserBlockCheck.class})
-    @After(adviceClass = StopwatchEndAdvice.class)
+    @After(adviceClass = {PermissionGrant.class, StopwatchEndAdvice.class})
     public void showHomeFollowingUsers(final HTTPRequestContext context, final HttpServletRequest request,
-            final HttpServletResponse response, final String userName) throws Exception {
+                                       final HttpServletResponse response, final String userName) throws Exception {
         final JSONObject user = (JSONObject) request.getAttribute(User.USER);
 
         final AbstractFreeMarkerRenderer renderer = new SkinRenderer(request);
         context.setRenderer(renderer);
         renderer.setTemplateName("/home/following-users.ftl");
         final Map<String, Object> dataModel = renderer.getDataModel();
-        filler.fillHeaderAndFooter(request, response, dataModel);
+        dataModelService.fillHeaderAndFooter(request, response, dataModel);
 
         String pageNumStr = request.getParameter("p");
         if (Strings.isEmptyOrNull(pageNumStr) || !Strings.isNumeric(pageNumStr)) {
@@ -966,13 +1105,13 @@ public class UserProcessor {
             final JSONObject currentUser = (JSONObject) dataModel.get(Common.CURRENT_USER);
             final String followerId = currentUser.optString(Keys.OBJECT_ID);
 
-            final boolean isFollowing = followQueryService.isFollowing(followerId, followingId);
+            final boolean isFollowing = followQueryService.isFollowing(followerId, followingId, Follow.FOLLOWING_TYPE_C_USER);
             dataModel.put(Common.IS_FOLLOWING, isFollowing);
 
             for (final JSONObject followingUser : followingUsers) {
                 final String homeUserFollowingUserId = followingUser.optString(Keys.OBJECT_ID);
 
-                followingUser.put(Common.IS_FOLLOWING, followQueryService.isFollowing(followerId, homeUserFollowingUserId));
+                followingUser.put(Common.IS_FOLLOWING, followQueryService.isFollowing(followerId, homeUserFollowingUserId, Follow.FOLLOWING_TYPE_C_USER));
             }
         }
 
@@ -998,24 +1137,24 @@ public class UserProcessor {
     /**
      * Shows user home following tags page.
      *
-     * @param context the specified context
-     * @param request the specified request
+     * @param context  the specified context
+     * @param request  the specified request
      * @param response the specified response
      * @param userName the specified user name
      * @throws Exception exception
      */
     @RequestProcessing(value = "/member/{userName}/following/tags", method = HTTPRequestMethod.GET)
     @Before(adviceClass = {StopwatchStartAdvice.class, AnonymousViewCheck.class, UserBlockCheck.class})
-    @After(adviceClass = StopwatchEndAdvice.class)
+    @After(adviceClass = {PermissionGrant.class, StopwatchEndAdvice.class})
     public void showHomeFollowingTags(final HTTPRequestContext context, final HttpServletRequest request,
-            final HttpServletResponse response, final String userName) throws Exception {
+                                      final HttpServletResponse response, final String userName) throws Exception {
         final JSONObject user = (JSONObject) request.getAttribute(User.USER);
 
         final AbstractFreeMarkerRenderer renderer = new SkinRenderer(request);
         context.setRenderer(renderer);
         renderer.setTemplateName("/home/following-tags.ftl");
         final Map<String, Object> dataModel = renderer.getDataModel();
-        filler.fillHeaderAndFooter(request, response, dataModel);
+        dataModelService.fillHeaderAndFooter(request, response, dataModel);
 
         String pageNumStr = request.getParameter("p");
         if (Strings.isEmptyOrNull(pageNumStr) || !Strings.isNumeric(pageNumStr)) {
@@ -1044,13 +1183,13 @@ public class UserProcessor {
             final JSONObject currentUser = (JSONObject) dataModel.get(Common.CURRENT_USER);
             final String followerId = currentUser.optString(Keys.OBJECT_ID);
 
-            final boolean isFollowing = followQueryService.isFollowing(followerId, followingId);
+            final boolean isFollowing = followQueryService.isFollowing(followerId, followingId, Follow.FOLLOWING_TYPE_C_USER);
             dataModel.put(Common.IS_FOLLOWING, isFollowing);
 
             for (final JSONObject followingTag : followingTags) {
                 final String homeUserFollowingTagId = followingTag.optString(Keys.OBJECT_ID);
 
-                followingTag.put(Common.IS_FOLLOWING, followQueryService.isFollowing(followerId, homeUserFollowingTagId));
+                followingTag.put(Common.IS_FOLLOWING, followQueryService.isFollowing(followerId, homeUserFollowingTagId, Follow.FOLLOWING_TYPE_C_TAG));
             }
         }
 
@@ -1076,24 +1215,24 @@ public class UserProcessor {
     /**
      * Shows user home following articles page.
      *
-     * @param context the specified context
-     * @param request the specified request
+     * @param context  the specified context
+     * @param request  the specified request
      * @param response the specified response
      * @param userName the specified user name
      * @throws Exception exception
      */
     @RequestProcessing(value = "/member/{userName}/following/articles", method = HTTPRequestMethod.GET)
     @Before(adviceClass = {StopwatchStartAdvice.class, AnonymousViewCheck.class, UserBlockCheck.class})
-    @After(adviceClass = StopwatchEndAdvice.class)
+    @After(adviceClass = {PermissionGrant.class, StopwatchEndAdvice.class})
     public void showHomeFollowingArticles(final HTTPRequestContext context, final HttpServletRequest request,
-            final HttpServletResponse response, final String userName) throws Exception {
+                                          final HttpServletResponse response, final String userName) throws Exception {
         final JSONObject user = (JSONObject) request.getAttribute(User.USER);
 
         final AbstractFreeMarkerRenderer renderer = new SkinRenderer(request);
         context.setRenderer(renderer);
         renderer.setTemplateName("/home/following-articles.ftl");
         final Map<String, Object> dataModel = renderer.getDataModel();
-        filler.fillHeaderAndFooter(request, response, dataModel);
+        dataModelService.fillHeaderAndFooter(request, response, dataModel);
 
         String pageNumStr = request.getParameter("p");
         if (Strings.isEmptyOrNull(pageNumStr) || !Strings.isNumeric(pageNumStr)) {
@@ -1123,13 +1262,13 @@ public class UserProcessor {
             final JSONObject currentUser = (JSONObject) dataModel.get(Common.CURRENT_USER);
             final String followerId = currentUser.optString(Keys.OBJECT_ID);
 
-            final boolean isFollowing = followQueryService.isFollowing(followerId, followingId);
+            final boolean isFollowing = followQueryService.isFollowing(followerId, followingId, Follow.FOLLOWING_TYPE_C_USER);
             dataModel.put(Common.IS_FOLLOWING, isFollowing);
 
             for (final JSONObject followingArticle : followingArticles) {
                 final String homeUserFollowingArticleId = followingArticle.optString(Keys.OBJECT_ID);
 
-                followingArticle.put(Common.IS_FOLLOWING, followQueryService.isFollowing(followerId, homeUserFollowingArticleId));
+                followingArticle.put(Common.IS_FOLLOWING, followQueryService.isFollowing(followerId, homeUserFollowingArticleId, Follow.FOLLOWING_TYPE_C_ARTICLE));
             }
         }
 
@@ -1153,26 +1292,105 @@ public class UserProcessor {
     }
 
     /**
+     * Shows user home watching articles page.
+     *
+     * @param context  the specified context
+     * @param request  the specified request
+     * @param response the specified response
+     * @param userName the specified user name
+     * @throws Exception exception
+     */
+    @RequestProcessing(value = "/member/{userName}/watching/articles", method = HTTPRequestMethod.GET)
+    @Before(adviceClass = {StopwatchStartAdvice.class, AnonymousViewCheck.class, UserBlockCheck.class})
+    @After(adviceClass = {PermissionGrant.class, StopwatchEndAdvice.class})
+    public void showHomeWatchingArticles(final HTTPRequestContext context, final HttpServletRequest request,
+                                         final HttpServletResponse response, final String userName) throws Exception {
+        final JSONObject user = (JSONObject) request.getAttribute(User.USER);
+
+        final AbstractFreeMarkerRenderer renderer = new SkinRenderer(request);
+        context.setRenderer(renderer);
+        renderer.setTemplateName("/home/watching-articles.ftl");
+        final Map<String, Object> dataModel = renderer.getDataModel();
+        dataModelService.fillHeaderAndFooter(request, response, dataModel);
+
+        String pageNumStr = request.getParameter("p");
+        if (Strings.isEmptyOrNull(pageNumStr) || !Strings.isNumeric(pageNumStr)) {
+            pageNumStr = "1";
+        }
+
+        final int pageNum = Integer.valueOf(pageNumStr);
+
+        final int pageSize = Symphonys.getInt("userHomeFollowingArticlesCnt");
+        final int windowSize = Symphonys.getInt("userHomeFollowingArticlesWindowSize");
+
+        fillHomeUser(dataModel, user);
+
+        final String followingId = user.optString(Keys.OBJECT_ID);
+        dataModel.put(Follow.FOLLOWING_ID, followingId);
+
+        final int avatarViewMode = (int) request.getAttribute(UserExt.USER_AVATAR_VIEW_MODE);
+        avatarQueryService.fillUserAvatarURL(avatarViewMode, user);
+
+        final JSONObject followingArticlesResult = followQueryService.getWatchingArticles(avatarViewMode,
+                followingId, pageNum, pageSize);
+        final List<JSONObject> followingArticles = (List<JSONObject>) followingArticlesResult.opt(Keys.RESULTS);
+        dataModel.put(Common.USER_HOME_FOLLOWING_ARTICLES, followingArticles);
+
+        final boolean isLoggedIn = (Boolean) dataModel.get(Common.IS_LOGGED_IN);
+        if (isLoggedIn) {
+            final JSONObject currentUser = (JSONObject) dataModel.get(Common.CURRENT_USER);
+            final String followerId = currentUser.optString(Keys.OBJECT_ID);
+
+            final boolean isFollowing = followQueryService.isFollowing(followerId, followingId, Follow.FOLLOWING_TYPE_C_USER);
+            dataModel.put(Common.IS_FOLLOWING, isFollowing);
+
+            for (final JSONObject followingArticle : followingArticles) {
+                final String homeUserFollowingArticleId = followingArticle.optString(Keys.OBJECT_ID);
+
+                followingArticle.put(Common.IS_FOLLOWING, followQueryService.isFollowing(followerId, homeUserFollowingArticleId, Follow.FOLLOWING_TYPE_C_ARTICLE_WATCH));
+            }
+        }
+
+        user.put(UserExt.USER_T_CREATE_TIME, new Date(user.getLong(Keys.OBJECT_ID)));
+
+        final int followingArticleCnt = followingArticlesResult.optInt(Pagination.PAGINATION_RECORD_COUNT);
+        final int pageCount = (int) Math.ceil(followingArticleCnt / (double) pageSize);
+
+        final List<Integer> pageNums = Paginator.paginate(pageNum, pageSize, pageCount, windowSize);
+        if (!pageNums.isEmpty()) {
+            dataModel.put(Pagination.PAGINATION_FIRST_PAGE_NUM, pageNums.get(0));
+            dataModel.put(Pagination.PAGINATION_LAST_PAGE_NUM, pageNums.get(pageNums.size() - 1));
+        }
+
+        dataModel.put(Pagination.PAGINATION_CURRENT_PAGE_NUM, pageNum);
+        dataModel.put(Pagination.PAGINATION_PAGE_COUNT, pageCount);
+        dataModel.put(Pagination.PAGINATION_PAGE_NUMS, pageNums);
+        dataModel.put(Pagination.PAGINATION_RECORD_COUNT, followingArticleCnt);
+
+        dataModel.put(Common.TYPE, "watchingArticles");
+    }
+
+    /**
      * Shows user home follower users page.
      *
-     * @param context the specified context
-     * @param request the specified request
+     * @param context  the specified context
+     * @param request  the specified request
      * @param response the specified response
      * @param userName the specified user name
      * @throws Exception exception
      */
     @RequestProcessing(value = "/member/{userName}/followers", method = HTTPRequestMethod.GET)
     @Before(adviceClass = {StopwatchStartAdvice.class, AnonymousViewCheck.class, UserBlockCheck.class})
-    @After(adviceClass = StopwatchEndAdvice.class)
+    @After(adviceClass = {PermissionGrant.class, StopwatchEndAdvice.class})
     public void showHomeFollowers(final HTTPRequestContext context, final HttpServletRequest request,
-            final HttpServletResponse response, final String userName) throws Exception {
+                                  final HttpServletResponse response, final String userName) throws Exception {
         final JSONObject user = (JSONObject) request.getAttribute(User.USER);
 
         final AbstractFreeMarkerRenderer renderer = new SkinRenderer(request);
         context.setRenderer(renderer);
         renderer.setTemplateName("/home/followers.ftl");
         final Map<String, Object> dataModel = renderer.getDataModel();
-        filler.fillHeaderAndFooter(request, response, dataModel);
+        dataModelService.fillHeaderAndFooter(request, response, dataModel);
 
         String pageNumStr = request.getParameter("p");
         if (Strings.isEmptyOrNull(pageNumStr) || !Strings.isNumeric(pageNumStr)) {
@@ -1203,13 +1421,17 @@ public class UserProcessor {
             final JSONObject currentUser = (JSONObject) dataModel.get(Common.CURRENT_USER);
             final String followerId = currentUser.optString(Keys.OBJECT_ID);
 
-            final boolean isFollowing = followQueryService.isFollowing(followerId, followingId);
+            final boolean isFollowing = followQueryService.isFollowing(followerId, followingId, Follow.FOLLOWING_TYPE_C_USER);
             dataModel.put(Common.IS_FOLLOWING, isFollowing);
 
             for (final JSONObject followerUser : followerUsers) {
                 final String homeUserFollowerUserId = followerUser.optString(Keys.OBJECT_ID);
 
-                followerUser.put(Common.IS_FOLLOWING, followQueryService.isFollowing(followerId, homeUserFollowerUserId));
+                followerUser.put(Common.IS_FOLLOWING, followQueryService.isFollowing(followerId, homeUserFollowerUserId, Follow.FOLLOWING_TYPE_C_USER));
+            }
+
+            if (followerId.equals(followingId)) {
+                notificationMgmtService.makeRead(followingId, Notification.DATA_TYPE_C_NEW_FOLLOWER);
             }
         }
 
@@ -1230,29 +1452,31 @@ public class UserProcessor {
         dataModel.put(Pagination.PAGINATION_RECORD_COUNT, followerUserCnt);
 
         dataModel.put(Common.TYPE, "followers");
+
+        notificationMgmtService.makeRead(followingId, Notification.DATA_TYPE_C_NEW_FOLLOWER);
     }
 
     /**
      * Shows user home points page.
      *
-     * @param context the specified context
-     * @param request the specified request
+     * @param context  the specified context
+     * @param request  the specified request
      * @param response the specified response
      * @param userName the specified user name
      * @throws Exception exception
      */
     @RequestProcessing(value = "/member/{userName}/points", method = HTTPRequestMethod.GET)
     @Before(adviceClass = {StopwatchStartAdvice.class, AnonymousViewCheck.class, UserBlockCheck.class})
-    @After(adviceClass = StopwatchEndAdvice.class)
+    @After(adviceClass = {PermissionGrant.class, StopwatchEndAdvice.class})
     public void showHomePoints(final HTTPRequestContext context, final HttpServletRequest request,
-            final HttpServletResponse response, final String userName) throws Exception {
+                               final HttpServletResponse response, final String userName) throws Exception {
         final JSONObject user = (JSONObject) request.getAttribute(User.USER);
 
         final AbstractFreeMarkerRenderer renderer = new SkinRenderer(request);
         context.setRenderer(renderer);
         renderer.setTemplateName("/home/points.ftl");
         final Map<String, Object> dataModel = renderer.getDataModel();
-        filler.fillHeaderAndFooter(request, response, dataModel);
+        dataModelService.fillHeaderAndFooter(request, response, dataModel);
 
         String pageNumStr = request.getParameter("p");
         if (Strings.isEmptyOrNull(pageNumStr) || !Strings.isNumeric(pageNumStr)) {
@@ -1283,7 +1507,7 @@ public class UserProcessor {
             final JSONObject currentUser = (JSONObject) dataModel.get(Common.CURRENT_USER);
             final String followerId = currentUser.optString(Keys.OBJECT_ID);
 
-            final boolean isFollowing = followQueryService.isFollowing(followerId, user.optString(Keys.OBJECT_ID));
+            final boolean isFollowing = followQueryService.isFollowing(followerId, user.optString(Keys.OBJECT_ID), Follow.FOLLOWING_TYPE_C_USER);
             dataModel.put(Common.IS_FOLLOWING, isFollowing);
         }
 
@@ -1308,14 +1532,14 @@ public class UserProcessor {
     /**
      * Updates user geo status.
      *
-     * @param context the specified context
-     * @param request the specified request
+     * @param context  the specified context
+     * @param request  the specified request
      * @param response the specified response
      */
     @RequestProcessing(value = "/settings/geo/status", method = HTTPRequestMethod.POST)
     @Before(adviceClass = {LoginCheck.class, CSRFCheck.class})
     public void updateGeoStatus(final HTTPRequestContext context,
-            final HttpServletRequest request, final HttpServletResponse response) {
+                                final HttpServletRequest request, final HttpServletResponse response) {
         context.renderJSON();
 
         JSONObject requestJSONObject;
@@ -1348,8 +1572,8 @@ public class UserProcessor {
     /**
      * Updates user privacy.
      *
-     * @param context the specified context
-     * @param request the specified request
+     * @param context  the specified context
+     * @param request  the specified request
      * @param response the specified response
      * @throws Exception exception
      */
@@ -1374,6 +1598,7 @@ public class UserProcessor {
         final boolean followingUserStatus = requestJSONObject.optBoolean(UserExt.USER_FOLLOWING_USER_STATUS);
         final boolean followingTagStatus = requestJSONObject.optBoolean(UserExt.USER_FOLLOWING_TAG_STATUS);
         final boolean followingArticleStatus = requestJSONObject.optBoolean(UserExt.USER_FOLLOWING_ARTICLE_STATUS);
+        final boolean watchingArticleStatus = requestJSONObject.optBoolean(UserExt.USER_WATCHING_ARTICLE_STATUS);
         final boolean followerStatus = requestJSONObject.optBoolean(UserExt.USER_FOLLOWER_STATUS);
         final boolean pointStatus = requestJSONObject.optBoolean(UserExt.USER_POINT_STATUS);
         final boolean onlineStatus = requestJSONObject.optBoolean(UserExt.USER_ONLINE_STATUS);
@@ -1396,6 +1621,8 @@ public class UserProcessor {
         user.put(UserExt.USER_FOLLOWING_TAG_STATUS, followingTagStatus
                 ? UserExt.USER_XXX_STATUS_C_PUBLIC : UserExt.USER_XXX_STATUS_C_PRIVATE);
         user.put(UserExt.USER_FOLLOWING_ARTICLE_STATUS, followingArticleStatus
+                ? UserExt.USER_XXX_STATUS_C_PUBLIC : UserExt.USER_XXX_STATUS_C_PRIVATE);
+        user.put(UserExt.USER_WATCHING_ARTICLE_STATUS, watchingArticleStatus
                 ? UserExt.USER_XXX_STATUS_C_PUBLIC : UserExt.USER_XXX_STATUS_C_PRIVATE);
         user.put(UserExt.USER_FOLLOWER_STATUS, followerStatus
                 ? UserExt.USER_XXX_STATUS_C_PUBLIC : UserExt.USER_XXX_STATUS_C_PRIVATE);
@@ -1424,8 +1651,8 @@ public class UserProcessor {
     /**
      * Updates user function.
      *
-     * @param context the specified context
-     * @param request the specified request
+     * @param context  the specified context
+     * @param request  the specified request
      * @param response the specified response
      * @throws Exception exception
      */
@@ -1491,8 +1718,8 @@ public class UserProcessor {
     /**
      * Updates user profiles.
      *
-     * @param context the specified context
-     * @param request the specified request
+     * @param context  the specified context
+     * @param request  the specified request
      * @param response the specified response
      * @throws Exception exception
      */
@@ -1531,8 +1758,8 @@ public class UserProcessor {
     /**
      * Updates user avatar.
      *
-     * @param context the specified context
-     * @param request the specified request
+     * @param context  the specified context
+     * @param request  the specified request
      * @param response the specified response
      * @throws Exception exception
      */
@@ -1576,8 +1803,8 @@ public class UserProcessor {
     /**
      * Point transfer.
      *
-     * @param context the specified context
-     * @param request the specified request
+     * @param context  the specified context
+     * @param request  the specified request
      * @param response the specified response
      * @throws Exception exception
      */
@@ -1615,8 +1842,8 @@ public class UserProcessor {
     /**
      * Updates user B3log sync.
      *
-     * @param context the specified context
-     * @param request the specified request
+     * @param context  the specified context
+     * @param request  the specified request
      * @param response the specified response
      * @throws Exception exception
      */
@@ -1656,8 +1883,8 @@ public class UserProcessor {
     /**
      * Updates user password.
      *
-     * @param context the specified context
-     * @param request the specified request
+     * @param context  the specified context
+     * @param request  the specified request
      * @param response the specified response
      * @throws Exception exception
      */
@@ -1696,8 +1923,8 @@ public class UserProcessor {
     /**
      * Updates user emotions.
      *
-     * @param context the specified context
-     * @param request the specified request
+     * @param context  the specified context
+     * @param request  the specified request
      * @param response the specified response
      * @throws Exception exception
      */
@@ -1725,114 +1952,16 @@ public class UserProcessor {
     }
 
     /**
-     * Sync user. Experimental API.
-     *
-     * @param context the specified context
-     * @param request the specified request
-     * @param response the specified response
-     * @throws Exception exception
-     */
-    @RequestProcessing(value = "/apis/user", method = HTTPRequestMethod.POST)
-    public void syncUser(final HTTPRequestContext context, final HttpServletRequest request, final HttpServletResponse response)
-            throws Exception {
-        context.renderJSON();
-
-        final JSONObject requestJSONObject = Requests.parseRequestJSONObject(request, response);
-
-        final String name = requestJSONObject.optString(User.USER_NAME);
-        final String email = requestJSONObject.optString(User.USER_EMAIL);
-        final String password = requestJSONObject.optString(User.USER_PASSWORD);
-        final String clientHost = requestJSONObject.optString(Client.CLIENT_HOST);
-        final String clientB3Key = requestJSONObject.optString(UserExt.USER_B3_KEY);
-        final String addArticleURL = clientHost + "/apis/symphony/article";
-        final String updateArticleURL = clientHost + "/apis/symphony/article";
-        final String addCommentURL = clientHost + "/apis/symphony/comment";
-
-        if (UserRegisterValidation.invalidUserName(name)) {
-            LOGGER.log(Level.WARN, "Sync add user[name={0}, host={1}] error, caused by the username is invalid",
-                    name, clientHost);
-
-            return;
-        }
-
-//        final String maybeIP = StringUtils.substringBetween(clientHost, "://", ":");
-//        if (isIPv4(maybeIP)) {
-//            LOGGER.log(Level.WARN, "Sync add user[name={0}, host={1}] error, caused by the client host is invalid",
-//                    name, clientHost);
-//
-//            return;
-//        }
-        JSONObject user = userQueryService.getUserByEmail(email);
-        if (null == user) {
-            user = new JSONObject();
-            user.put(User.USER_NAME, name);
-            user.put(User.USER_EMAIL, email);
-            user.put(User.USER_PASSWORD, password);
-            user.put(UserExt.USER_LANGUAGE, "zh_CN");
-            user.put(UserExt.USER_B3_KEY, clientB3Key);
-            user.put(UserExt.USER_B3_CLIENT_ADD_ARTICLE_URL, addArticleURL);
-            user.put(UserExt.USER_B3_CLIENT_UPDATE_ARTICLE_URL, updateArticleURL);
-            user.put(UserExt.USER_B3_CLIENT_ADD_COMMENT_URL, addCommentURL);
-            user.put(UserExt.USER_STATUS, UserExt.USER_STATUS_C_VALID); // One Move
-
-            try {
-                final String id = userMgmtService.addUser(user);
-                user.put(Keys.OBJECT_ID, id);
-
-                userMgmtService.updateSyncB3(user);
-
-                LOGGER.log(Level.INFO, "Added a user[{0}] via Solo[{1}] sync", name, clientHost);
-
-                context.renderTrueResult();
-            } catch (final ServiceException e) {
-                LOGGER.log(Level.ERROR, "Sync add user[name={0}, host={1}] error: " + e.getMessage(), name, clientHost);
-            }
-
-            return;
-        }
-
-        String userKey = user.optString(UserExt.USER_B3_KEY);
-        if (StringUtils.isBlank(userKey) || (Strings.isNumeric(userKey) && userKey.length() == clientB3Key.length())) {
-            userKey = clientB3Key;
-
-            user.put(UserExt.USER_B3_KEY, userKey);
-            userMgmtService.updateUser(user.optString(Keys.OBJECT_ID), user);
-        }
-
-        if (!userKey.equals(clientB3Key)) {
-            LOGGER.log(Level.WARN, "Sync update user[name={0}, email={1}, host={2}] B3Key dismatch [sym={3}, solo={4}]",
-                    name, email, clientHost, user.optString(UserExt.USER_B3_KEY), clientB3Key);
-
-            return;
-        }
-
-        user.put(UserExt.USER_B3_KEY, clientB3Key);
-        user.put(UserExt.USER_B3_CLIENT_ADD_ARTICLE_URL, addArticleURL);
-        user.put(UserExt.USER_B3_CLIENT_UPDATE_ARTICLE_URL, updateArticleURL);
-        user.put(UserExt.USER_B3_CLIENT_ADD_COMMENT_URL, addCommentURL);
-
-        try {
-            userMgmtService.updateSyncB3(user);
-
-            LOGGER.log(Level.INFO, "Updated a user[name={0}] via Solo[{1}] sync", name, clientHost);
-
-            context.renderTrueResult();
-        } catch (final ServiceException e) {
-            LOGGER.log(Level.ERROR, "Sync update user[name=" + name + ", host=" + clientHost + "] error", e);
-        }
-    }
-
-    /**
      * Resets unverified users.
      *
-     * @param context the specified context
-     * @param request the specified request
+     * @param context  the specified context
+     * @param request  the specified request
      * @param response the specified response
      * @throws Exception exception
      */
     @RequestProcessing(value = "/cron/users/reset-unverified", method = HTTPRequestMethod.GET)
     public void resetUnverifiedUsers(final HTTPRequestContext context,
-            final HttpServletRequest request, final HttpServletResponse response) throws Exception {
+                                     final HttpServletRequest request, final HttpServletResponse response) throws Exception {
         final String key = Symphonys.get("keyOfSymphony");
         if (!key.equals(request.getParameter("key"))) {
             response.sendError(HttpServletResponse.SC_FORBIDDEN);
@@ -1848,8 +1977,8 @@ public class UserProcessor {
     /**
      * Lists usernames.
      *
-     * @param context the specified context
-     * @param request the specified request
+     * @param context  the specified context
+     * @param request  the specified request
      * @param response the specified response
      * @throws Exception exception
      */
@@ -1893,17 +2022,23 @@ public class UserProcessor {
     /**
      * Lists emotions.
      *
-     * @param context the specified context
-     * @param request the specified request
+     * @param context  the specified context
+     * @param request  the specified request
      * @param response the specified response
      * @throws Exception exception
      */
     @RequestProcessing(value = "/users/emotions", method = HTTPRequestMethod.GET)
     public void getEmotions(final HTTPRequestContext context, final HttpServletRequest request,
-            final HttpServletResponse response) throws Exception {
+                            final HttpServletResponse response) throws Exception {
         context.renderJSON();
 
         final JSONObject currentUser = (JSONObject) request.getAttribute(User.USER);
+        if (null == currentUser) {
+            context.renderJSONValue("emotions", "");
+
+            return;
+        }
+
         final String userId = currentUser.optString(Keys.OBJECT_ID);
         final String emotions = emotionQueryService.getEmojis(userId);
 
@@ -1913,8 +2048,8 @@ public class UserProcessor {
     /**
      * Loads usernames.
      *
-     * @param context the specified context
-     * @param request the specified request
+     * @param context  the specified context
+     * @param request  the specified request
      * @param response the specified response
      * @throws Exception exception
      */
@@ -1937,9 +2072,13 @@ public class UserProcessor {
      * Fills home user.
      *
      * @param dataModel the specified data model
-     * @param user the specified user
+     * @param user      the specified user
      */
     private void fillHomeUser(final Map<String, Object> dataModel, final JSONObject user) {
         dataModel.put(User.USER, user);
+
+        final String roleId = user.optString(User.USER_ROLE);
+        final JSONObject role = roleQueryService.getRole(roleId);
+        user.put(Role.ROLE_NAME, role.optString(Role.ROLE_NAME));
     }
 }

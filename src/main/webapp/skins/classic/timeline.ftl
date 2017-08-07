@@ -5,7 +5,7 @@
         <@head title="${timelineLabel} - ${symphonyLabel}">
         <meta name="description" content="${timelineLabel}"/>
         </@head>
-        <link type="text/css" rel="stylesheet" href="${staticServePath}/css/index.css?${staticResourceVersion}" />
+        <link rel="stylesheet" href="${staticServePath}/css/index.css?${staticResourceVersion}" />
         <link rel="canonical" href="${servePath}/timeline">
     </head>
     <body>
@@ -17,24 +17,25 @@
                     <#if timelines?size <= 0>
                     <div id="emptyTimeline" class="no-list">${emptyTimelineLabel}</div>
                     </#if>
-                    <div class="list single-line ft-gray timeline">
-                        <ul id="ul">
+                    <div class="list single-line ft-gray timeline<#if timelines?size <= 0> fn-none</#if>">
+                        <ul>
                             <#list timelines as timeline>
                             <li>${timeline.content}</li>
                             </#list>
                         </ul>
                     </div>
                     </div>
-                    <#include "common/domains.ftl">
+
                 </div>
                 <div class="side">
                     <#include "side.ftl">
                 </div>
             </div>
         </div>
+        <#include "common/domains.ftl">
         <#include "footer.ftl">
 
-        <script type="text/javascript" src="${staticServePath}/js/channel${miniPostfix}.js?${staticResourceVersion}"></script>
+        <script src="${staticServePath}/js/channel${miniPostfix}.js?${staticResourceVersion}"></script>
         <script>
             // Init [Timeline] channel
             TimelineChannel.init("${wsScheme}://${serverHost}:${serverPort}${contextPath}/timeline-channel", ${timelineCnt});

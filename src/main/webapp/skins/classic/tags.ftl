@@ -5,7 +5,7 @@
         <@head title="${tagLabel} - ${symphonyLabel}">
         <meta name="description" content="${symphonyLabel} ${trendTagsLabel},${symphonyLabel} ${coldTagsLabel}"/>
         </@head>
-        <link type="text/css" rel="stylesheet" href="${staticServePath}/css/index.css?${staticResourceVersion}" />
+        <link rel="stylesheet" href="${staticServePath}/css/index.css?${staticResourceVersion}" />
         <link rel="canonical" href="${servePath}/tags">
     </head>
     <body>
@@ -20,20 +20,22 @@
                             </h2>
                         </div>
                         <div class="module-panel list">
-                            <ul class="tags-trend">
+                            <ul>
                                 <#list trendTags as tag>
-                                <li class="fn-clear<#if !tag_has_next> last</#if>"> 
+                                <li class="fn-flex">
                                     <#if tag.tagIconPath!="">
-                                    <div class="avatar fn-left" style="background-image:url('${staticServePath}/images/tags/${tag.tagIconPath}')" alt="${tag.tagTitle}"></div>
+                                    <div class="avatar" style="background-image:url('${staticServePath}/images/tags/${tag.tagIconPath}')" alt="${tag.tagTitle}"></div>
                                     </#if>
                                     <div class="fn-flex-1">
-                                    <h2><a class="ft-red" rel="tag" href="${servePath}/tag/${tag.tagURI}">${tag.tagTitle}</a></h2>
+                                        <div class="fn-clear">
+                                            <h3 class="fn-left"><a rel="tag" class="ft-a-title" href="${servePath}/tag/${tag.tagURI}">${tag.tagTitle}</a></h3>
+                                            <span class="ft-gray fn-right">
+                                                ${referenceLabel} ${tag.tagReferenceCount?c} &nbsp;
+                                                ${cmtLabel} ${tag.tagCommentCount?c}
+                                            </span>
+                                        </div>
+                                        <div class="content-reset">${tag.tagDescription}</div>
                                     </div>
-                                    <span class="ft-gray fn-right">
-                                        ${referenceLabel} ${tag.tagReferenceCount?c} &nbsp;
-                                        ${cmtLabel} ${tag.tagCommentCount?c} 
-                                    </span>
-                                    <div class="content-reset">${tag.tagDescription}</div>
                                 </li>
                                 </#list>
                             </ul>
@@ -48,18 +50,14 @@
                                 ${coldTagsLabel}
                             </h2>
                         </div>
-                        <div class="module-panel list">
-                            <ul class="tags-cold">
+                        <div class="module-panel">
+                            <ul class="module-list">
                                 <#list coldTags as tag>
-                                <li class="fn-clear<#if !tag_has_next> last</#if>">
+                                <li>
                                     <#if tag.tagIconPath!="">
-                                    <div class="avatar fn-left" style="background-image: url('${staticServePath}/images/tags/${tag.tagIconPath}')" alt="${tag.tagTitle}"></div>
+                                    <div class="avatar-small" style="background-image: url('${staticServePath}/images/tags/${tag.tagIconPath}')" alt="${tag.tagTitle}"></div>
                                     </#if>
-                                    <h2><a rel="tag" class="ft-green" href="${servePath}/tag/${tag.tagURI}">${tag.tagTitle}</a></h2>
-                                    <span class="ft-gray fn-right">
-                                        ${referenceLabel} ${tag.tagReferenceCount?c} &nbsp;
-                                        ${cmtLabel} ${tag.tagCommentCount?c} 
-                                    </span>
+                                    <a class="ft-a-title" rel="tag" href="${servePath}/tag/${tag.tagURI}">${tag.tagTitle}</a>
                                     <div class="content-reset">${tag.tagDescription}</div>
                                 </li>
                                 </#list>

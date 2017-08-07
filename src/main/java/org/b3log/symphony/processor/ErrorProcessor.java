@@ -1,6 +1,6 @@
 /*
  * Symphony - A modern community (forum/SNS/blog) platform written in Java.
- * Copyright (C) 2012-2016,  b3log.org & hacpai.com
+ * Copyright (C) 2012-2017,  b3log.org & hacpai.com
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,11 +17,8 @@
  */
 package org.b3log.symphony.processor;
 
-import java.util.Map;
-import javax.inject.Inject;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import org.apache.commons.lang.StringUtils;
+import org.b3log.latke.ioc.inject.Inject;
 import org.b3log.latke.logging.Level;
 import org.b3log.latke.logging.Logger;
 import org.b3log.latke.service.LangPropsService;
@@ -35,10 +32,15 @@ import org.b3log.latke.servlet.renderer.freemarker.AbstractFreeMarkerRenderer;
 import org.b3log.latke.util.Locales;
 import org.b3log.symphony.model.Common;
 import org.b3log.symphony.model.UserExt;
+import org.b3log.symphony.processor.advice.PermissionGrant;
 import org.b3log.symphony.processor.advice.stopwatch.StopwatchEndAdvice;
 import org.b3log.symphony.processor.advice.stopwatch.StopwatchStartAdvice;
+import org.b3log.symphony.service.DataModelService;
 import org.b3log.symphony.service.TimelineMgmtService;
-import org.b3log.symphony.util.Filler;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.util.Map;
 
 /**
  * Error processor.
@@ -53,7 +55,7 @@ public class ErrorProcessor {
     /**
      * Logger.
      */
-    private static final Logger LOGGER = Logger.getLogger(ErrorProcessor.class.getName());
+    private static final Logger LOGGER = Logger.getLogger(ErrorProcessor.class);
 
     /**
      * Language service.
@@ -68,30 +70,29 @@ public class ErrorProcessor {
     private TimelineMgmtService timelineMgmtService;
 
     /**
-     * Filler.
+     * Data model service.
      */
     @Inject
-    private Filler filler;
+    private DataModelService dataModelService;
 
     /**
      * Handles the error.
      *
-     * @param context the specified context
-     * @param request the specified HTTP servlet request
-     * @param response the specified HTTP servlet response
+     * @param context    the specified context
+     * @param request    the specified HTTP servlet request
+     * @param response   the specified HTTP servlet response
      * @param statusCode the specified status code
      * @throws Exception exception
      */
     @RequestProcessing(value = "/error/{statusCode}", method = {HTTPRequestMethod.GET, HTTPRequestMethod.POST})
     @Before(adviceClass = StopwatchStartAdvice.class)
-    @After(adviceClass = StopwatchEndAdvice.class)
+    @After(adviceClass = {PermissionGrant.class, StopwatchEndAdvice.class})
     public void handleErrorPage(final HTTPRequestContext context, final HttpServletRequest request,
-            final HttpServletResponse response, final String statusCode) throws Exception {
+                                final HttpServletResponse response, final String statusCode) throws Exception {
         if (StringUtils.equals("GET", request.getMethod())) {
             final String requestURI = request.getRequestURI();
             final String templateName = statusCode + ".ftl";
-            LOGGER.log(Level.TRACE, "Shows error page[requestURI={0}, templateName={1}]",
-                    new Object[]{requestURI, templateName});
+            LOGGER.log(Level.TRACE, "Shows error page[requestURI={0}, templateName={1}]", requestURI, templateName);
 
             final AbstractFreeMarkerRenderer renderer = new SkinRenderer(request);
             renderer.setTemplateName("error/" + templateName);
@@ -99,12 +100,12 @@ public class ErrorProcessor {
 
             final Map<String, Object> dataModel = renderer.getDataModel();
             dataModel.putAll(langPropsService.getAll(Locales.getLocale()));
-            filler.fillHeaderAndFooter(request, response, dataModel);
+            dataModelService.fillHeaderAndFooter(request, response, dataModel);
             if (HttpServletResponse.SC_FORBIDDEN == Integer.valueOf(statusCode)) {
                 dataModel.put(Common.TIMELINES, timelineMgmtService.getTimelines());
-                filler.fillSideHotArticles(UserExt.USER_AVATAR_VIEW_MODE_C_ORIGINAL, dataModel);
-                filler.fillRandomArticles(UserExt.USER_AVATAR_VIEW_MODE_C_ORIGINAL, dataModel);
-                filler.fillSideTags(dataModel);
+                dataModelService.fillSideHotArticles(UserExt.USER_AVATAR_VIEW_MODE_C_ORIGINAL, dataModel);
+                dataModelService.fillRandomArticles(UserExt.USER_AVATAR_VIEW_MODE_C_ORIGINAL, dataModel);
+                dataModelService.fillSideTags(dataModel);
             }
         } else {
             context.renderJSON().renderMsg(statusCode);

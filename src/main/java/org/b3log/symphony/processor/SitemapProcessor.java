@@ -1,6 +1,6 @@
 /*
  * Symphony - A modern community (forum/SNS/blog) platform written in Java.
- * Copyright (C) 2012-2016,  b3log.org & hacpai.com
+ * Copyright (C) 2012-2017,  b3log.org & hacpai.com
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,9 +17,7 @@
  */
 package org.b3log.symphony.processor;
 
-import java.io.IOException;
-import javax.inject.Inject;
-import javax.servlet.http.HttpServletResponse;
+import org.b3log.latke.ioc.inject.Inject;
 import org.b3log.latke.logging.Level;
 import org.b3log.latke.logging.Logger;
 import org.b3log.latke.servlet.HTTPRequestContext;
@@ -29,6 +27,9 @@ import org.b3log.latke.servlet.annotation.RequestProcessor;
 import org.b3log.latke.servlet.renderer.TextXMLRenderer;
 import org.b3log.symphony.model.sitemap.Sitemap;
 import org.b3log.symphony.service.SitemapQueryService;
+
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
 
 /**
  * Sitemap processor.
@@ -43,7 +44,7 @@ public class SitemapProcessor {
     /**
      * Logger.
      */
-    private static final Logger LOGGER = Logger.getLogger(SitemapProcessor.class.getName());
+    private static final Logger LOGGER = Logger.getLogger(SitemapProcessor.class);
 
     /**
      * Sitemap query service.

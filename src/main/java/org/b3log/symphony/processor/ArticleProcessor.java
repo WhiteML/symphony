@@ -1,6 +1,6 @@
 /*
  * Symphony - A modern community (forum/SNS/blog) platform written in Java.
- * Copyright (C) 2012-2016,  b3log.org & hacpai.com
+ * Copyright (C) 2012-2017,  b3log.org & hacpai.com
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,32 +18,14 @@
 package org.b3log.symphony.processor;
 
 import com.qiniu.util.Auth;
-import java.awt.Graphics;
-import java.awt.Transparency;
-import java.awt.image.BufferedImage;
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import javax.imageio.ImageIO;
-import javax.inject.Inject;
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
-import javax.servlet.http.HttpSession;
 import jodd.util.Base64;
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.StringUtils;
 import org.b3log.latke.Keys;
-import org.b3log.latke.Latkes;
+import org.b3log.latke.ioc.inject.Inject;
 import org.b3log.latke.logging.Level;
 import org.b3log.latke.logging.Logger;
 import org.b3log.latke.model.Pagination;
-import org.b3log.latke.model.Role;
 import org.b3log.latke.model.User;
 import org.b3log.latke.service.LangPropsService;
 import org.b3log.latke.service.ServiceException;
@@ -59,52 +41,32 @@ import org.b3log.latke.util.Requests;
 import org.b3log.latke.util.Stopwatchs;
 import org.b3log.latke.util.Strings;
 import org.b3log.symphony.cache.DomainCache;
-import org.b3log.symphony.model.Article;
-import org.b3log.symphony.model.Client;
-import org.b3log.symphony.model.Comment;
-import org.b3log.symphony.model.Common;
-import org.b3log.symphony.model.Domain;
-import org.b3log.symphony.model.Liveness;
-import org.b3log.symphony.model.Pointtransfer;
-import org.b3log.symphony.model.Referral;
-import org.b3log.symphony.model.Revision;
-import org.b3log.symphony.model.Reward;
-import org.b3log.symphony.model.Tag;
-import org.b3log.symphony.model.UserExt;
-import org.b3log.symphony.processor.advice.AnonymousViewCheck;
-import org.b3log.symphony.processor.advice.CSRFCheck;
-import org.b3log.symphony.processor.advice.CSRFToken;
-import org.b3log.symphony.processor.advice.LoginCheck;
+import org.b3log.symphony.model.*;
+import org.b3log.symphony.processor.advice.*;
 import org.b3log.symphony.processor.advice.stopwatch.StopwatchEndAdvice;
 import org.b3log.symphony.processor.advice.stopwatch.StopwatchStartAdvice;
 import org.b3log.symphony.processor.advice.validate.ArticleAddValidation;
 import org.b3log.symphony.processor.advice.validate.ArticleUpdateValidation;
 import org.b3log.symphony.processor.advice.validate.UserRegisterValidation;
-import org.b3log.symphony.service.ArticleMgmtService;
-import org.b3log.symphony.service.ArticleQueryService;
-import org.b3log.symphony.service.CharacterQueryService;
-import org.b3log.symphony.service.ClientMgmtService;
-import org.b3log.symphony.service.ClientQueryService;
-import org.b3log.symphony.service.CommentQueryService;
-import org.b3log.symphony.service.DomainQueryService;
-import org.b3log.symphony.service.FollowQueryService;
-import org.b3log.symphony.service.LivenessMgmtService;
-import org.b3log.symphony.service.ReferralMgmtService;
-import org.b3log.symphony.service.RewardQueryService;
-import org.b3log.symphony.service.ShortLinkQueryService;
-import org.b3log.symphony.service.UserMgmtService;
-import org.b3log.symphony.service.UserQueryService;
-import org.b3log.symphony.service.VoteQueryService;
-import org.b3log.symphony.util.Emotions;
-import org.b3log.symphony.util.Filler;
-import org.b3log.symphony.util.Markdowns;
-import org.b3log.symphony.util.Sessions;
-import org.b3log.symphony.util.Symphonys;
+import org.b3log.symphony.service.*;
+import org.b3log.symphony.util.*;
 import org.json.JSONObject;
+
+import javax.imageio.ImageIO;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
+import java.awt.*;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
+import java.io.File;
+import java.io.IOException;
+import java.util.*;
+import java.util.List;
 
 /**
  * Article processor.
- *
  * <ul>
  * <li>Shows an article (/article/{articleId}), GET</li>
  * <li>Shows article pre adding form page (/pre-post), GET</li>
@@ -112,24 +74,23 @@ import org.json.JSONObject;
  * <li>Adds an article (/post) <em>locally</em>, POST</li>
  * <li>Shows an article updating form page (/update) <em>locally</em>, GET</li>
  * <li>Updates an article (/article/{id}) <em>locally</em>, PUT</li>
- * <li>Adds an article (/rhythm/article) <em>remotely</em>, POST</li>
- * <li>Updates an article (/rhythm/article) <em>remotely</em>, PUT</li>
  * <li>Markdowns text (/markdown), POST</li>
  * <li>Rewards an article (/article/reward), POST</li>
  * <li>Gets an article preview content (/article/{articleId}/preview), GET</li>
  * <li>Sticks an article (/article/stick), POST</li>
- * <li>Gets article revisions (/article/{articleId}/revisions), GET</li>
+ * <li>Gets an article's revisions (/article/{id}/revisions), GET</li>
  * <li>Gets article image (/article/{articleId}/image), GET</li>
  * <li>Checks article title (/article/check-title), POST</li>
+ * <li>Removes an article (/article/{id}/remove), POST</li>
  * </ul>
- *
  * <p>
  * The '<em>locally</em>' means user post an article on Symphony directly rather than receiving an article from
  * externally (for example Rhythm).
  * </p>
  *
  * @author <a href="http://88250.b3log.org">Liang Ding</a>
- * @version 1.24.19.33, Oct 26, 2016
+ * @author <a href="http://zephyr.b3log.org">Zephyr</a>
+ * @version 1.26.28.46, Jul 4, 2017
  * @since 0.2.0
  */
 @RequestProcessor
@@ -138,7 +99,13 @@ public class ArticleProcessor {
     /**
      * Logger.
      */
-    private static final Logger LOGGER = Logger.getLogger(ArticleProcessor.class.getName());
+    private static final Logger LOGGER = Logger.getLogger(ArticleProcessor.class);
+
+    /**
+     * Revision query service.
+     */
+    @Inject
+    private RevisionQueryService revisionQueryService;
 
     /**
      * Short link query service.
@@ -243,16 +210,65 @@ public class ArticleProcessor {
     private DomainCache domainCache;
 
     /**
-     * Filler.
+     * Data model service.
      */
     @Inject
-    private Filler filler;
+    private DataModelService dataModelService;
+
+    /**
+     * Removes an article.
+     *
+     * @param context  the specified context
+     * @param request  the specified request
+     * @param response the specified response
+     * @throws Exception exception
+     */
+    @RequestProcessing(value = "/article/{id}/remove", method = HTTPRequestMethod.POST)
+    @Before(adviceClass = {StopwatchStartAdvice.class, LoginCheck.class, PermissionCheck.class})
+    @After(adviceClass = {StopwatchEndAdvice.class})
+    public void removeArticle(final HTTPRequestContext context, final HttpServletRequest request, final HttpServletResponse response,
+                              final String id) throws Exception {
+        if (StringUtils.isBlank(id)) {
+            response.sendError(HttpServletResponse.SC_NOT_FOUND);
+
+            return;
+        }
+
+        final JSONObject currentUser = (JSONObject) request.getAttribute(User.USER);
+        final String currentUserId = currentUser.optString(Keys.OBJECT_ID);
+        final JSONObject article = articleQueryService.getArticle(id);
+        if (null == article) {
+            response.sendError(HttpServletResponse.SC_NOT_FOUND);
+
+            return;
+        }
+
+        final String authorId = article.optString(Article.ARTICLE_AUTHOR_ID);
+        if (!authorId.equals(currentUserId)) {
+            response.sendError(HttpServletResponse.SC_FORBIDDEN);
+
+            return;
+        }
+
+        context.renderJSON();
+        try {
+            articleMgmtService.removeArticle(id);
+
+            context.renderJSONValue(Keys.STATUS_CODE, StatusCodes.SUCC);
+            context.renderJSONValue(Article.ARTICLE_T_ID, id);
+        } catch (final ServiceException e) {
+            final String msg = e.getMessage();
+
+            context.renderMsg(msg);
+            context.renderJSONValue(Keys.STATUS_CODE, StatusCodes.ERR);
+        }
+    }
 
     /**
      * Checks article title.
      *
-     * @param context the specified context
-     * @param request the specified request
+     * @param context  the specified context
+     * @param request  the specified request
      * @param response the specified response
      * @throws Exception exception
      */
@@ -261,39 +277,82 @@ public class ArticleProcessor {
     @After(adviceClass = {StopwatchEndAdvice.class})
     public void checkArticleTitle(final HTTPRequestContext context, final HttpServletRequest request, final HttpServletResponse response)
             throws Exception {
+        final JSONObject currentUser = (JSONObject) request.getAttribute(User.USER);
+        final String currentUserId = currentUser.optString(Keys.OBJECT_ID);
         final JSONObject requestJSONObject = Requests.parseRequestJSONObject(request, context.getResponse());
         String title = requestJSONObject.optString(Article.ARTICLE_TITLE);
         title = StringUtils.trim(title);
+        String id = requestJSONObject.optString(Article.ARTICLE_T_ID);
 
         final JSONObject article = articleQueryService.getArticleByTitle(title);
-
         if (null == article) {
             context.renderJSON(true);
 
             return;
         }
 
-        final String authorId = article.optString(Article.ARTICLE_AUTHOR_ID);
-        final JSONObject author = userQueryService.getUser(authorId);
-        final String userName = author.optString(User.USER_NAME);
-        String msg = langPropsService.get("duplicatedArticleTitleLabel");
-        msg = msg.replace("{user}", "<a target='_blank' href='/member/" + userName + "'>" + userName + "</a>");
-        msg = msg.replace("{article}", "<a target='_blank' href='/article/" + article.optString(Keys.OBJECT_ID)
-                + "'>" + title + "</a>");
+        if (StringUtils.isBlank(id)) { // Add
+            final String authorId = article.optString(Article.ARTICLE_AUTHOR_ID);
 
-        final JSONObject ret = new JSONObject();
-        ret.put(Keys.STATUS_CODE, false);
-        ret.put(Keys.MSG, msg);
+            String msg;
+            if (authorId.equals(currentUserId)) {
+                msg = langPropsService.get("duplicatedArticleTitleSelfLabel");
+                msg = msg.replace("{article}", "<a target='_blank' href='/article/" + article.optString(Keys.OBJECT_ID)
+                        + "'>" + title + "</a>");
+            } else {
+                final JSONObject author = userQueryService.getUser(authorId);
+                final String userName = author.optString(User.USER_NAME);
 
-        context.renderJSON(ret);
+                msg = langPropsService.get("duplicatedArticleTitleLabel");
+                msg = msg.replace("{user}", "<a target='_blank' href='/member/" + userName + "'>" + userName + "</a>");
+                msg = msg.replace("{article}", "<a target='_blank' href='/article/" + article.optString(Keys.OBJECT_ID)
+                        + "'>" + title + "</a>");
+            }
+
+            final JSONObject ret = new JSONObject();
+            ret.put(Keys.STATUS_CODE, false);
+            ret.put(Keys.MSG, msg);
+
+            context.renderJSON(ret);
+        } else { // Update
+            final JSONObject oldArticle = articleQueryService.getArticle(id);
+            if (oldArticle.optString(Article.ARTICLE_TITLE).equals(title)) {
+                context.renderJSON(true);
+
+                return;
+            }
+
+            final String authorId = article.optString(Article.ARTICLE_AUTHOR_ID);
+
+            String msg;
+            if (authorId.equals(currentUserId)) {
+                msg = langPropsService.get("duplicatedArticleTitleSelfLabel");
+                msg = msg.replace("{article}", "<a target='_blank' href='/article/" + article.optString(Keys.OBJECT_ID)
+                        + "'>" + title + "</a>");
+            } else {
+                final JSONObject author = userQueryService.getUser(authorId);
+                final String userName = author.optString(User.USER_NAME);
+
+                msg = langPropsService.get("duplicatedArticleTitleLabel");
+                msg = msg.replace("{user}", "<a target='_blank' href='/member/" + userName + "'>" + userName + "</a>");
+                msg = msg.replace("{article}", "<a target='_blank' href='/article/" + article.optString(Keys.OBJECT_ID)
+                        + "'>" + title + "</a>");
+            }
+
+            final JSONObject ret = new JSONObject();
+            ret.put(Keys.STATUS_CODE, false);
+            ret.put(Keys.MSG, msg);
+
+            context.renderJSON(ret);
+        }
     }
 
     /**
      * Gets article image.
      *
-     * @param context the specified context
-     * @param request the specified request
-     * @param response the specified response
+     * @param context   the specified context
+     * @param request   the specified request
+     * @param response  the specified response
      * @param articleId the specified article id
      * @throws Exception exception
      */
@@ -301,7 +360,7 @@ public class ArticleProcessor {
     @Before(adviceClass = {StopwatchStartAdvice.class, LoginCheck.class})
     @After(adviceClass = {StopwatchEndAdvice.class})
     public void getArticleImage(final HTTPRequestContext context, final HttpServletRequest request, final HttpServletResponse response,
-            final String articleId) throws Exception {
+                                final String articleId) throws Exception {
         final JSONObject article = articleQueryService.getArticle(articleId);
         final String authorId = article.optString(Article.ARTICLE_AUTHOR_ID);
 
@@ -359,20 +418,16 @@ public class ArticleProcessor {
     }
 
     /**
-     * Gets article revisions.
+     * Gets an article's revisions.
      *
      * @param context the specified context
-     * @param request the specified request
-     * @param response the specified response
-     * @param articleId the specified article id
-     * @throws Exception exception
+     * @param id      the specified article id
      */
-    @RequestProcessing(value = "/article/{articleId}/revisions", method = HTTPRequestMethod.GET)
-    @Before(adviceClass = {StopwatchStartAdvice.class, LoginCheck.class})
+    @RequestProcessing(value = "/article/{id}/revisions", method = HTTPRequestMethod.GET)
+    @Before(adviceClass = {StopwatchStartAdvice.class, LoginCheck.class, PermissionCheck.class})
     @After(adviceClass = {StopwatchEndAdvice.class})
-    public void getArticleRevisions(final HTTPRequestContext context, final HttpServletRequest request, final HttpServletResponse response,
-            final String articleId) throws Exception {
-        final List<JSONObject> revisions = articleQueryService.getArticleRevisions(articleId);
+    public void getArticleRevisions(final HTTPRequestContext context, final String id) {
+        final List<JSONObject> revisions = revisionQueryService.getArticleRevisions(id);
         final JSONObject ret = new JSONObject();
         ret.put(Keys.STATUS_CODE, true);
         ret.put(Revision.REVISIONS, (Object) revisions);
@@ -383,14 +438,14 @@ public class ArticleProcessor {
     /**
      * Shows pre-add article.
      *
-     * @param context the specified context
-     * @param request the specified request
+     * @param context  the specified context
+     * @param request  the specified request
      * @param response the specified response
      * @throws Exception exception
      */
     @RequestProcessing(value = "/pre-post", method = HTTPRequestMethod.GET)
     @Before(adviceClass = {StopwatchStartAdvice.class, LoginCheck.class})
-    @After(adviceClass = {CSRFToken.class, StopwatchEndAdvice.class})
+    @After(adviceClass = {CSRFToken.class, PermissionGrant.class, StopwatchEndAdvice.class})
     public void showPreAddArticle(final HTTPRequestContext context, final HttpServletRequest request, final HttpServletResponse response)
             throws Exception {
         final AbstractFreeMarkerRenderer renderer = new SkinRenderer(request);
@@ -401,7 +456,7 @@ public class ArticleProcessor {
 
         dataModel.put(Common.BROADCAST_POINT, Pointtransfer.TRANSFER_SUM_C_ADD_ARTICLE_BROADCAST);
 
-        filler.fillHeaderAndFooter(request, response, dataModel);
+        dataModelService.fillHeaderAndFooter(request, response, dataModel);
     }
 
     /**
@@ -409,29 +464,48 @@ public class ArticleProcessor {
      *
      * @param dataModel the specified data model
      */
-    private void fillDomainsWithTags(Map<String, Object> dataModel) {
+    private void fillDomainsWithTags(final Map<String, Object> dataModel) {
         final List<JSONObject> domains = domainCache.getDomains(Integer.MAX_VALUE);
-
-        dataModel.put(Domain.DOMAINS, domains);
-
+        dataModel.put(Common.ADD_ARTICLE_DOMAINS, domains);
         for (final JSONObject domain : domains) {
             final List<JSONObject> tags = domainQueryService.getTags(domain.optString(Keys.OBJECT_ID));
 
             domain.put(Domain.DOMAIN_T_TAGS, (Object) tags);
+        }
+
+        final JSONObject user = (JSONObject) dataModel.get(Common.CURRENT_USER);
+        if (null == user) {
+            return;
+        }
+
+        try {
+            final JSONObject followingTagsResult = followQueryService.getFollowingTags(
+                    user.optString(Keys.OBJECT_ID), 1, 28);
+            final List<JSONObject> followingTags = (List<JSONObject>) followingTagsResult.opt(Keys.RESULTS);
+            if (!followingTags.isEmpty()) {
+                final JSONObject userWatched = new JSONObject();
+                userWatched.put(Keys.OBJECT_ID, String.valueOf(System.currentTimeMillis()));
+                userWatched.put(Domain.DOMAIN_TITLE, langPropsService.get("notificationFollowingLabel"));
+                userWatched.put(Domain.DOMAIN_T_TAGS, (Object) followingTags);
+
+                domains.add(0, userWatched);
+            }
+        } catch (final Exception e) {
+            LOGGER.log(Level.ERROR, "Get user [name=" + user.optString(User.USER_NAME) + "] following tags failed", e);
         }
     }
 
     /**
      * Shows add article.
      *
-     * @param context the specified context
-     * @param request the specified request
+     * @param context  the specified context
+     * @param request  the specified request
      * @param response the specified response
      * @throws Exception exception
      */
     @RequestProcessing(value = "/post", method = HTTPRequestMethod.GET)
     @Before(adviceClass = {StopwatchStartAdvice.class, LoginCheck.class})
-    @After(adviceClass = {CSRFToken.class, StopwatchEndAdvice.class})
+    @After(adviceClass = {CSRFToken.class, PermissionGrant.class, StopwatchEndAdvice.class})
     public void showAddArticle(final HTTPRequestContext context, final HttpServletRequest request, final HttpServletResponse response)
             throws Exception {
         final AbstractFreeMarkerRenderer renderer = new SkinRenderer(request);
@@ -455,9 +529,9 @@ public class ArticleProcessor {
         final long fileMaxSize = Symphonys.getLong("upload.file.maxSize");
         dataModel.put("fileMaxSize", fileMaxSize);
 
-        fillDomainsWithTags(dataModel);
-
         String tags = request.getParameter(Tag.TAGS);
+        final JSONObject currentUser = (JSONObject) request.getAttribute(User.USER);
+
         if (StringUtils.isBlank(tags)) {
             tags = "";
 
@@ -488,8 +562,7 @@ public class ArticleProcessor {
                     continue;
                 }
 
-                final JSONObject currentUser = (JSONObject) request.getAttribute(User.USER);
-                if (!Role.ADMIN_ROLE.equals(currentUser.optString(User.USER_ROLE))
+                if (!Role.ROLE_ID_C_ADMIN.equals(currentUser.optString(User.USER_ROLE))
                         && ArrayUtils.contains(Symphonys.RESERVED_TAGS, tagTitle)) {
                     continue;
                 }
@@ -522,12 +595,13 @@ public class ArticleProcessor {
             dataModel.put(Article.ARTICLE_TYPE, articleType);
         }
 
-        final String at = request.getParameter(Common.AT);
+        String at = request.getParameter(Common.AT);
+        at = StringUtils.trim(at);
         if (StringUtils.isNotBlank(at)) {
-            dataModel.put(Common.AT, at);
+            dataModel.put(Common.AT, at + " ");
         }
 
-        filler.fillHeaderAndFooter(request, response, dataModel);
+        dataModelService.fillHeaderAndFooter(request, response, dataModel);
 
         String rewardEditorPlaceholderLabel = langPropsService.get("rewardEditorPlaceholderLabel");
         rewardEditorPlaceholderLabel = rewardEditorPlaceholderLabel.replace("{point}",
@@ -539,22 +613,41 @@ public class ArticleProcessor {
         articleContentErrorLabel = articleContentErrorLabel.replace("{maxArticleContentLength}",
                 String.valueOf(ArticleAddValidation.MAX_ARTICLE_CONTENT_LENGTH));
         dataModel.put("articleContentErrorLabel", articleContentErrorLabel);
+
+        final String b3logKey = currentUser.optString(UserExt.USER_B3_KEY);
+        dataModel.put("hasB3Key", !Strings.isEmptyOrNull(b3logKey));
+
+        fillPostArticleRequisite(dataModel, currentUser);
+        fillDomainsWithTags(dataModel);
+    }
+
+    private void fillPostArticleRequisite(final Map<String, Object> dataModel, final JSONObject currentUser) {
+        boolean requisite = false;
+        String requisiteMsg = "";
+
+        if (!UserExt.updatedAvatar(currentUser)) {
+            requisite = true;
+            requisiteMsg = langPropsService.get("uploadAvatarThenPostLabel");
+        }
+
+        dataModel.put(Common.REQUISITE, requisite);
+        dataModel.put(Common.REQUISITE_MSG, requisiteMsg);
     }
 
     /**
      * Shows article with the specified article id.
      *
-     * @param context the specified context
-     * @param request the specified request
-     * @param response the specified response
+     * @param context   the specified context
+     * @param request   the specified request
+     * @param response  the specified response
      * @param articleId the specified article id
      * @throws Exception exception
      */
     @RequestProcessing(value = "/article/{articleId}", method = HTTPRequestMethod.GET)
     @Before(adviceClass = {StopwatchStartAdvice.class, AnonymousViewCheck.class})
-    @After(adviceClass = {CSRFToken.class, StopwatchEndAdvice.class})
+    @After(adviceClass = {CSRFToken.class, PermissionGrant.class, StopwatchEndAdvice.class})
     public void showArticle(final HTTPRequestContext context, final HttpServletRequest request, final HttpServletResponse response,
-            final String articleId) throws Exception {
+                            final String articleId) throws Exception {
         final AbstractFreeMarkerRenderer renderer = new SkinRenderer(request);
         context.setRenderer(renderer);
 
@@ -575,7 +668,7 @@ public class ArticleProcessor {
             session.setAttribute(Article.ARTICLE_T_ID, articleId);
         }
 
-        filler.fillHeaderAndFooter(request, response, dataModel);
+        dataModelService.fillHeaderAndFooter(request, response, dataModel);
 
         final String authorId = article.optString(Article.ARTICLE_AUTHOR_ID);
         final JSONObject author = userQueryService.getUser(authorId);
@@ -594,25 +687,28 @@ public class ArticleProcessor {
         article.put(Common.IS_MY_ARTICLE, false);
         article.put(Article.ARTICLE_T_AUTHOR, author);
         article.put(Common.REWARDED, false);
+        article.put(Common.REWARED_COUNT, rewardQueryService.rewardedCount(articleId, Reward.TYPE_C_ARTICLE));
         if (!article.has(Article.ARTICLE_CLIENT_ARTICLE_PERMALINK)) { // TODO: for legacy data
             article.put(Article.ARTICLE_CLIENT_ARTICLE_PERMALINK, "");
         }
+        article.put(Article.ARTICLE_REVISION_COUNT, revisionQueryService.count(articleId, Revision.DATA_TYPE_C_ARTICLE));
 
         articleQueryService.processArticleContent(article, request);
 
         String cmtViewModeStr = request.getParameter("m");
-
         JSONObject currentUser;
         String currentUserId = null;
         final boolean isLoggedIn = (Boolean) dataModel.get(Common.IS_LOGGED_IN);
         if (isLoggedIn) {
             currentUser = (JSONObject) dataModel.get(Common.CURRENT_USER);
             currentUserId = currentUser.optString(Keys.OBJECT_ID);
-
             article.put(Common.IS_MY_ARTICLE, currentUserId.equals(article.optString(Article.ARTICLE_AUTHOR_ID)));
 
-            final boolean isFollowing = followQueryService.isFollowing(currentUserId, articleId);
+            final boolean isFollowing = followQueryService.isFollowing(currentUserId, articleId, Follow.FOLLOWING_TYPE_C_ARTICLE);
             dataModel.put(Common.IS_FOLLOWING, isFollowing);
+
+            final boolean isWatching = followQueryService.isFollowing(currentUserId, articleId, Follow.FOLLOWING_TYPE_C_ARTICLE_WATCH);
+            dataModel.put(Common.IS_WATCHING, isWatching);
 
             final int articleVote = voteQueryService.isVoted(currentUserId, articleId);
             article.put(Article.ARTICLE_T_VOTE, articleVote);
@@ -620,8 +716,7 @@ public class ArticleProcessor {
             if (currentUserId.equals(author.optString(Keys.OBJECT_ID))) {
                 article.put(Common.REWARDED, true);
             } else {
-                article.put(Common.REWARDED,
-                        rewardQueryService.isRewarded(currentUserId, articleId, Reward.TYPE_C_ARTICLE));
+                article.put(Common.REWARDED, rewardQueryService.isRewarded(currentUserId, articleId, Reward.TYPE_C_ARTICLE));
             }
 
             if (Strings.isEmptyOrNull(cmtViewModeStr) || !Strings.isNumeric(cmtViewModeStr)) {
@@ -631,8 +726,7 @@ public class ArticleProcessor {
             cmtViewModeStr = "0";
         }
 
-        int cmtViewMode = Integer.valueOf(cmtViewModeStr);
-
+        final int cmtViewMode = Integer.valueOf(cmtViewModeStr);
         dataModel.put(UserExt.USER_COMMENT_VIEW_MODE, cmtViewMode);
 
         if (!(Boolean) request.getAttribute(Keys.HttpRequest.IS_SEARCH_ENGINE_BOT)) {
@@ -644,9 +738,9 @@ public class ArticleProcessor {
             livenessMgmtService.incLiveness(viewer.optString(Keys.OBJECT_ID), Liveness.LIVENESS_PV);
         }
 
-        filler.fillRelevantArticles(avatarViewMode, dataModel, article);
-        filler.fillRandomArticles(avatarViewMode, dataModel);
-        filler.fillSideHotArticles(avatarViewMode, dataModel);
+        dataModelService.fillRelevantArticles(avatarViewMode, dataModel, article);
+        dataModelService.fillRandomArticles(avatarViewMode, dataModel);
+        dataModelService.fillSideHotArticles(avatarViewMode, dataModel);
 
         // Qiniu file upload authenticate
         final Auth auth = Auth.create(Symphonys.get("qiniu.accessKey"), Symphonys.get("qiniu.secretKey"));
@@ -741,8 +835,8 @@ public class ArticleProcessor {
         }
 
         // Load comments
-        final List<JSONObject> articleComments = commentQueryService.getArticleComments(
-                avatarViewMode, articleId, pageNum, pageSize, cmtViewMode);
+        final List<JSONObject> articleComments =
+                commentQueryService.getArticleComments(avatarViewMode, articleId, pageNum, pageSize, cmtViewMode);
         article.put(Article.ARTICLE_T_COMMENTS, (Object) articleComments);
 
         // Fill comment thank
@@ -789,11 +883,16 @@ public class ArticleProcessor {
 
             referralMgmtService.updateReferral(referral);
         }
+
+        if (StringUtils.isBlank(article.optString(Article.ARTICLE_AUDIO_URL))) {
+            final String uid = StringUtils.isBlank(currentUserId) ? "visitor" : currentUserId;
+
+            articleMgmtService.genArticleAudio(article, uid);
+        }
     }
 
     /**
      * Adds an article locally.
-     *
      * <p>
      * The request json object (an article):
      * <pre>
@@ -810,14 +909,15 @@ public class ArticleProcessor {
      * </pre>
      * </p>
      *
-     * @param context the specified context
-     * @param request the specified request
+     * @param context  the specified context
+     * @param request  the specified request
      * @param response the specified response
-     * @throws IOException io exception
+     * @throws IOException      io exception
      * @throws ServletException servlet exception
      */
     @RequestProcessing(value = "/article", method = HTTPRequestMethod.POST)
-    @Before(adviceClass = {StopwatchStartAdvice.class, LoginCheck.class, CSRFCheck.class, ArticleAddValidation.class})
+    @Before(adviceClass = {StopwatchStartAdvice.class, LoginCheck.class, CSRFCheck.class, ArticleAddValidation.class,
+            PermissionCheck.class})
     @After(adviceClass = StopwatchEndAdvice.class)
     public void addArticle(final HTTPRequestContext context, final HttpServletRequest request, final HttpServletResponse response)
             throws IOException, ServletException {
@@ -834,10 +934,11 @@ public class ArticleProcessor {
         final String articleRewardContent = requestJSONObject.optString(Article.ARTICLE_REWARD_CONTENT);
         final int articleRewardPoint = requestJSONObject.optInt(Article.ARTICLE_REWARD_POINT);
         final String ip = Requests.getRemoteAddr(request);
-        final String ua = request.getHeader("User-Agent");
+        final String ua = request.getHeader(Common.USER_AGENT);
         final boolean isAnonymous = requestJSONObject.optBoolean(Article.ARTICLE_ANONYMOUS, false);
         final int articleAnonymous = isAnonymous
                 ? Article.ARTICLE_ANONYMOUS_C_ANONYMOUS : Article.ARTICLE_ANONYMOUS_C_PUBLIC;
+        final boolean syncWithSymphonyClient = requestJSONObject.optBoolean(Article.ARTICLE_SYNC_TO_CLIENT, false);
 
         final JSONObject article = new JSONObject();
         article.put(Article.ARTICLE_TITLE, articleTitle);
@@ -856,16 +957,14 @@ public class ArticleProcessor {
             article.put(Article.ARTICLE_UA, ua);
         }
         article.put(Article.ARTICLE_ANONYMOUS, articleAnonymous);
+        article.put(Article.ARTICLE_SYNC_TO_CLIENT, syncWithSymphonyClient);
 
         try {
             final JSONObject currentUser = (JSONObject) request.getAttribute(User.USER);
 
             article.put(Article.ARTICLE_AUTHOR_ID, currentUser.optString(Keys.OBJECT_ID));
 
-            final String authorEmail = currentUser.optString(User.USER_EMAIL);
-            article.put(Article.ARTICLE_AUTHOR_EMAIL, authorEmail);
-
-            if (!Role.ADMIN_ROLE.equals(currentUser.optString(User.USER_ROLE))) {
+            if (!Role.ROLE_ID_C_ADMIN.equals(currentUser.optString(User.USER_ROLE))) {
                 articleTags = articleMgmtService.filterReservedTags(articleTags);
             }
 
@@ -880,28 +979,30 @@ public class ArticleProcessor {
             article.put(Article.ARTICLE_TAGS, articleTags);
             article.put(Article.ARTICLE_T_IS_BROADCAST, false);
 
-            articleMgmtService.addArticle(article);
+            final String articleId = articleMgmtService.addArticle(article);
 
-            context.renderTrueResult();
+            context.renderJSONValue(Keys.STATUS_CODE, StatusCodes.SUCC);
+            context.renderJSONValue(Article.ARTICLE_T_ID, articleId);
         } catch (final ServiceException e) {
             final String msg = e.getMessage();
             LOGGER.log(Level.ERROR, "Adds article[title=" + articleTitle + "] failed: {0}", e.getMessage());
 
             context.renderMsg(msg);
+            context.renderJSONValue(Keys.STATUS_CODE, StatusCodes.ERR);
         }
     }
 
     /**
      * Shows update article.
      *
-     * @param context the specified context
-     * @param request the specified request
+     * @param context  the specified context
+     * @param request  the specified request
      * @param response the specified response
      * @throws Exception exception
      */
     @RequestProcessing(value = "/update", method = HTTPRequestMethod.GET)
     @Before(adviceClass = {StopwatchStartAdvice.class, LoginCheck.class})
-    @After(adviceClass = {CSRFToken.class, StopwatchEndAdvice.class})
+    @After(adviceClass = {CSRFToken.class, PermissionGrant.class, StopwatchEndAdvice.class})
     public void showUpdateArticle(final HTTPRequestContext context, final HttpServletRequest request, final HttpServletResponse response)
             throws Exception {
         final String articleId = request.getParameter("id");
@@ -911,16 +1012,14 @@ public class ArticleProcessor {
             return;
         }
 
-        final int avatarViewMode = (int) request.getAttribute(UserExt.USER_AVATAR_VIEW_MODE);
-
-        final JSONObject article = articleQueryService.getArticleById(avatarViewMode, articleId);
+        final JSONObject article = articleQueryService.getArticle(articleId);
         if (null == article) {
             response.sendError(HttpServletResponse.SC_NOT_FOUND);
 
             return;
         }
 
-        final JSONObject currentUser = Sessions.currentUser(request);
+        final JSONObject currentUser = (JSONObject) request.getAttribute(User.USER);
         if (null == currentUser
                 || !currentUser.optString(Keys.OBJECT_ID).equals(article.optString(Article.ARTICLE_AUTHOR_ID))) {
             response.sendError(HttpServletResponse.SC_FORBIDDEN);
@@ -936,7 +1035,7 @@ public class ArticleProcessor {
 
         dataModel.put(Article.ARTICLE, article);
 
-        filler.fillHeaderAndFooter(request, response, dataModel);
+        dataModelService.fillHeaderAndFooter(request, response, dataModel);
 
         // Qiniu file upload authenticate
         final Auth auth = Auth.create(Symphonys.get("qiniu.accessKey"), Symphonys.get("qiniu.secretKey"));
@@ -960,11 +1059,15 @@ public class ArticleProcessor {
                 String.valueOf(Pointtransfer.TRANSFER_SUM_C_ADD_ARTICLE_REWARD));
         dataModel.put("rewardEditorPlaceholderLabel", rewardEditorPlaceholderLabel);
         dataModel.put(Common.BROADCAST_POINT, Pointtransfer.TRANSFER_SUM_C_ADD_ARTICLE_BROADCAST);
+
+        final String b3logKey = currentUser.optString(UserExt.USER_B3_KEY);
+        dataModel.put("hasB3Key", !Strings.isEmptyOrNull(b3logKey));
+
+        fillPostArticleRequisite(dataModel, currentUser);
     }
 
     /**
      * Updates an article locally.
-     *
      * <p>
      * The request json object (an article):
      * <pre>
@@ -980,17 +1083,18 @@ public class ArticleProcessor {
      * </pre>
      * </p>
      *
-     * @param context the specified context
-     * @param request the specified request
+     * @param context  the specified context
+     * @param request  the specified request
      * @param response the specified response
-     * @param id the specified article id
+     * @param id       the specified article id
      * @throws Exception exception
      */
     @RequestProcessing(value = "/article/{id}", method = HTTPRequestMethod.PUT)
-    @Before(adviceClass = {StopwatchStartAdvice.class, LoginCheck.class, CSRFCheck.class, ArticleUpdateValidation.class})
+    @Before(adviceClass = {StopwatchStartAdvice.class, LoginCheck.class, CSRFCheck.class, ArticleUpdateValidation.class,
+            PermissionCheck.class})
     @After(adviceClass = StopwatchEndAdvice.class)
     public void updateArticle(final HTTPRequestContext context, final HttpServletRequest request, final HttpServletResponse response,
-            final String id) throws Exception {
+                              final String id) throws Exception {
         if (Strings.isEmptyOrNull(id)) {
             response.sendError(HttpServletResponse.SC_NOT_FOUND);
 
@@ -1019,7 +1123,7 @@ public class ArticleProcessor {
         final String articleRewardContent = requestJSONObject.optString(Article.ARTICLE_REWARD_CONTENT);
         final int articleRewardPoint = requestJSONObject.optInt(Article.ARTICLE_REWARD_POINT);
         final String ip = Requests.getRemoteAddr(request);
-        final String ua = request.getHeader("User-Agent");
+        final String ua = request.getHeader(Common.USER_AGENT);
 
         final JSONObject article = new JSONObject();
         article.put(Keys.OBJECT_ID, id);
@@ -1049,10 +1153,7 @@ public class ArticleProcessor {
 
         article.put(Article.ARTICLE_AUTHOR_ID, currentUser.optString(Keys.OBJECT_ID));
 
-        final String authorEmail = currentUser.optString(User.USER_EMAIL);
-        article.put(Article.ARTICLE_AUTHOR_EMAIL, authorEmail);
-
-        if (!Role.ADMIN_ROLE.equals(currentUser.optString(User.USER_ROLE))) {
+        if (!Role.ROLE_ID_C_ADMIN.equals(currentUser.optString(User.USER_ROLE))) {
             articleTags = articleMgmtService.filterReservedTags(articleTags);
         }
 
@@ -1067,373 +1168,21 @@ public class ArticleProcessor {
         article.put(Article.ARTICLE_TAGS, articleTags);
 
         try {
-
             articleMgmtService.updateArticle(article);
-            context.renderTrueResult();
+
+            context.renderJSONValue(Keys.STATUS_CODE, StatusCodes.SUCC);
+            context.renderJSONValue(Article.ARTICLE_T_ID, id);
         } catch (final ServiceException e) {
             final String msg = e.getMessage();
             LOGGER.log(Level.ERROR, "Adds article[title=" + articleTitle + "] failed: {0}", e.getMessage());
 
             context.renderMsg(msg);
-        }
-    }
-
-    /**
-     * Adds an article remotely.
-     *
-     * <p>
-     * This interface will be called by Rhythm, so here is no article data validation, just only validate the B3
-     * key.</p>
-     *
-     * <p>
-     * The request json object, for example,
-     * <pre>
-     * {
-     *     "article": {
-     *         "articleAuthorEmail": "DL88250@gmail.com",
-     *         "articleContent": "&lt;p&gt;test&lt;\/p&gt;",
-     *         "articleCreateDate": 1350635469922,
-     *         "articlePermalink": "/articles/2012/10/19/1350635469866.html",
-     *         "articleTags": "test",
-     *         "articleTitle": "test",
-     *         "clientArticleId": "1350635469866",
-     *         "oId": "1350635469866"
-     *     },
-     *     "clientAdminEmail": "DL88250@gmail.com",
-     *     "clientHost": "http://localhost:11099",
-     *     "clientName": "B3log Solo",
-     *     "clientTitle": "简约设计の艺术",
-     *     "clientRuntimeEnv": "LOCAL",
-     *     "clientVersion": "0.5.0",
-     *     "symphonyKey": "....",
-     *     "userB3Key": "Your key"
-     * }
-     * </pre>
-     * </p>
-     *
-     * @param context the specified context
-     * @param request the specified request
-     * @param response the specified response
-     * @throws Exception exception
-     */
-    @RequestProcessing(value = "/rhythm/article", method = HTTPRequestMethod.POST)
-    @Before(adviceClass = StopwatchStartAdvice.class)
-    @After(adviceClass = StopwatchEndAdvice.class)
-    public void addArticleFromRhythm(final HTTPRequestContext context,
-            final HttpServletRequest request, final HttpServletResponse response) throws Exception {
-        context.renderJSON();
-
-        final JSONObject requestJSONObject = Requests.parseRequestJSONObject(request, response);
-
-        final String clientB3Key = requestJSONObject.getString(UserExt.USER_B3_KEY);
-        final String symphonyKey = requestJSONObject.getString(Common.SYMPHONY_KEY);
-        final String clientAdminEmail = requestJSONObject.getString(Client.CLIENT_ADMIN_EMAIL);
-        final String clientName = requestJSONObject.getString(Client.CLIENT_NAME);
-        final String clientTitle = requestJSONObject.getString(Client.CLIENT_T_TITLE);
-        final String clientVersion = requestJSONObject.getString(Client.CLIENT_VERSION);
-        final String clientHost = requestJSONObject.getString(Client.CLIENT_HOST);
-        final String clientRuntimeEnv = requestJSONObject.getString(Client.CLIENT_RUNTIME_ENV);
-
-//        final String maybeIP = StringUtils.substringBetween(clientHost, "://", ":");
-//        if (Networks.isIPv4(maybeIP)) {
-//            LOGGER.log(Level.WARN, "Sync add article error, caused by the client host [{0}] is invalid", clientHost);
-//
-//            return;
-//        }
-        final JSONObject user = userQueryService.getUserByEmail(clientAdminEmail);
-        if (null == user) {
-            LOGGER.log(Level.WARN, "The user[email={0}, host={1}] not found in community", clientAdminEmail, clientHost);
-
-            return;
-        }
-
-        final String userName = user.optString(User.USER_NAME);
-
-        String userKey = user.optString(UserExt.USER_B3_KEY);
-        if (StringUtils.isBlank(userKey) || (Strings.isNumeric(userKey) && userKey.length() == clientB3Key.length())) {
-            userKey = clientB3Key;
-
-            user.put(UserExt.USER_B3_KEY, userKey);
-            userMgmtService.updateUser(user.optString(Keys.OBJECT_ID), user);
-        }
-
-        if (!Symphonys.get("keyOfSymphony").equals(symphonyKey) || !userKey.equals(clientB3Key)) {
-            LOGGER.log(Level.WARN, "B3 key not match, ignored add article [name={0}, email={1}, host={2}, userSymKey={3}, userClientKey={4}]",
-                    userName, clientAdminEmail, clientHost, user.optString(UserExt.USER_B3_KEY), clientB3Key);
-
-            return;
-        }
-
-        if (UserExt.USER_STATUS_C_VALID != user.optInt(UserExt.USER_STATUS)) {
-            LOGGER.log(Level.WARN, "The user[name={0}, email={1}, host={2}] has been forbidden", userName, clientAdminEmail, clientHost);
-
-            return;
-        }
-
-        final JSONObject originalArticle = requestJSONObject.getJSONObject(Article.ARTICLE);
-        final String authorId = user.optString(Keys.OBJECT_ID);
-        final String clientArticleId = originalArticle.optString(Keys.OBJECT_ID);
-
-        final String articleTitle = originalArticle.optString(Article.ARTICLE_TITLE);
-        String articleTags = Tag.formatTags(originalArticle.optString(Article.ARTICLE_TAGS));
-        String articleContent = originalArticle.optString(Article.ARTICLE_CONTENT);
-
-        final JSONObject article = new JSONObject();
-        article.put(Article.ARTICLE_TITLE, articleTitle);
-        article.put(Article.ARTICLE_EDITOR_TYPE, 0);
-        article.put(Article.ARTICLE_SYNC_TO_CLIENT, false);
-        article.put(Article.ARTICLE_CLIENT_ARTICLE_ID, clientArticleId);
-        article.put(Article.ARTICLE_AUTHOR_ID, authorId);
-        article.put(Article.ARTICLE_AUTHOR_EMAIL, clientAdminEmail.toLowerCase().trim());
-
-        final String permalink = originalArticle.optString(Article.ARTICLE_PERMALINK);
-
-        final JSONObject articleExisted = articleQueryService.getArticleByClientArticleId(authorId, clientArticleId);
-        final boolean toAdd = null == articleExisted;
-        if (!toAdd) { // Client requests to add an article, but the article already exist in server
-            article.put(Keys.OBJECT_ID, articleExisted.optString(Keys.OBJECT_ID));
-            article.put(Article.ARTICLE_T_IS_BROADCAST, false);
-
-//            articleContent += "\n\n<p class='fn-clear'><span class='fn-right'><span class='ft-small'>该文章同步自</span> "
-//                    + "<i style='margin-right:5px;'><a target='_blank' href='"
-//                    + clientHost + permalink + "'>" + clientTitle + "</a></i></span></p>";
-        } else { // Add
-            final boolean isBroadcast = "aBroadcast".equals(permalink);
-            if (isBroadcast) {
-                articleContent += "\n\n<p class='fn-clear'><span class='fn-right'><span class='ft-small'>该广播来自</span> "
-                        + "<i style='margin-right:5px;'><a target='_blank' href='"
-                        + clientHost + "'>" + clientTitle + "</a></i></span></p>";
-            } else {
-//                articleContent += "\n\n<p class='fn-clear'><span class='fn-right'><span class='ft-small'>该文章同步自</span> "
-//                        + "<i style='margin-right:5px;'><a target='_blank' href='"
-//                        + clientHost + permalink + "'>" + clientTitle + "</a></i></span></p>";
-            }
-
-            article.put(Article.ARTICLE_T_IS_BROADCAST, isBroadcast);
-        }
-
-        article.put(Article.ARTICLE_CONTENT, articleContent);
-        article.put(Article.ARTICLE_CLIENT_ARTICLE_PERMALINK, clientHost + permalink);
-
-        if (!Role.ADMIN_ROLE.equals(user.optString(User.USER_ROLE))) {
-            articleTags = articleMgmtService.filterReservedTags(articleTags);
-        }
-
-        try {
-            articleTags = "B3log," + articleTags;
-            articleTags = Tag.formatTags(articleTags);
-            article.put(Article.ARTICLE_TAGS, articleTags);
-
-            if (toAdd) {
-                articleMgmtService.addArticle(article);
-            } else {
-                articleMgmtService.updateArticle(article);
-            }
-
-            context.renderTrueResult();
-        } catch (final ServiceException e) {
-            final String msg = langPropsService.get("updateFailLabel") + " - " + e.getMessage();
-            LOGGER.log(Level.ERROR, msg, e);
-
-            context.renderMsg(msg);
-        }
-
-        // Updates client record
-        JSONObject client = clientQueryService.getClientByAdminEmail(clientAdminEmail);
-        if (null == client) {
-            client = new JSONObject();
-            client.put(Client.CLIENT_ADMIN_EMAIL, clientAdminEmail);
-            client.put(Client.CLIENT_HOST, clientHost);
-            client.put(Client.CLIENT_NAME, clientName);
-            client.put(Client.CLIENT_RUNTIME_ENV, clientRuntimeEnv);
-            client.put(Client.CLIENT_VERSION, clientVersion);
-            client.put(Client.CLIENT_LATEST_ADD_COMMENT_TIME, 0L);
-            client.put(Client.CLIENT_LATEST_ADD_ARTICLE_TIME, System.currentTimeMillis());
-
-            clientMgmtService.addClient(client);
-        } else {
-            client.put(Client.CLIENT_ADMIN_EMAIL, clientAdminEmail);
-            client.put(Client.CLIENT_HOST, clientHost);
-            client.put(Client.CLIENT_NAME, clientName);
-            client.put(Client.CLIENT_RUNTIME_ENV, clientRuntimeEnv);
-            client.put(Client.CLIENT_VERSION, clientVersion);
-            client.put(Client.CLIENT_LATEST_ADD_ARTICLE_TIME, System.currentTimeMillis());
-
-            clientMgmtService.updateClient(client);
-        }
-    }
-
-    /**
-     * Updates an article remotely.
-     *
-     * <p>
-     * This interface will be called by Rhythm, so here is no article data validation, just only validate the B3
-     * key.</p>
-     *
-     * <p>
-     * The request json object, for example,
-     * <pre>
-     * {
-     *     "article": {
-     *         "articleAuthorEmail": "DL88250@gmail.com",
-     *         "articleContent": "&lt;p&gt;test&lt;\/p&gt;",
-     *         "articleCreateDate": 1350635469922,
-     *         "articlePermalink": "/articles/2012/10/19/1350635469866.html",
-     *         "articleTags": "test",
-     *         "articleTitle": "test",
-     *         "clientArticleId": "1350635469866",
-     *         "oId": "1350635469866"
-     *     },
-     *     "clientAdminEmail": "DL88250@gmail.com",
-     *     "clientHost": "http://localhost:11099",
-     *     "clientName": "B3log Solo",
-     *     "clientTitle": "简约设计の艺术",
-     *     "clientRuntimeEnv": "LOCAL",
-     *     "clientVersion": "0.5.0",
-     *     "symphonyKey": "....",
-     *     "userB3Key": "Your key"
-     * }
-     * </pre>
-     * </p>
-     *
-     * @param context the specified context
-     * @param request the specified request
-     * @param response the specified response
-     * @throws Exception exception
-     */
-    @RequestProcessing(value = "/rhythm/article", method = HTTPRequestMethod.PUT)
-    @Before(adviceClass = StopwatchStartAdvice.class)
-    @After(adviceClass = StopwatchEndAdvice.class)
-    public void updateArticleFromRhythm(final HTTPRequestContext context,
-            final HttpServletRequest request, final HttpServletResponse response) throws Exception {
-        context.renderJSON();
-
-        final JSONObject requestJSONObject = Requests.parseRequestJSONObject(request, response);
-
-        final String clientB3Key = requestJSONObject.getString(UserExt.USER_B3_KEY);
-        final String symphonyKey = requestJSONObject.getString(Common.SYMPHONY_KEY);
-        final String clientAdminEmail = requestJSONObject.getString(Client.CLIENT_ADMIN_EMAIL);
-        final String clientName = requestJSONObject.getString(Client.CLIENT_NAME);
-        final String clientTitle = requestJSONObject.getString(Client.CLIENT_T_TITLE);
-        final String clientVersion = requestJSONObject.getString(Client.CLIENT_VERSION);
-        final String clientHost = requestJSONObject.getString(Client.CLIENT_HOST);
-        final String clientRuntimeEnv = requestJSONObject.getString(Client.CLIENT_RUNTIME_ENV);
-
-//        final String maybeIP = StringUtils.substringBetween(clientHost, "://", ":");
-//        if (Networks.isIPv4(maybeIP)) {
-//            LOGGER.log(Level.WARN, "Sync update article error, caused by the client host [{0}] is invalid", clientHost);
-//
-//            return;
-//        }
-        final JSONObject user = userQueryService.getUserByEmail(clientAdminEmail);
-        if (null == user) {
-            LOGGER.log(Level.WARN, "The user[email={0}, host={1}] not found in community", clientAdminEmail, clientHost);
-
-            return;
-        }
-
-        final String userName = user.optString(User.USER_NAME);
-
-        String userKey = user.optString(UserExt.USER_B3_KEY);
-        if (StringUtils.isBlank(userKey) || (Strings.isNumeric(userKey) && userKey.length() == clientB3Key.length())) {
-            userKey = clientB3Key;
-
-            user.put(UserExt.USER_B3_KEY, userKey);
-            userMgmtService.updateUser(user.optString(Keys.OBJECT_ID), user);
-        }
-
-        if (!Symphonys.get("keyOfSymphony").equals(symphonyKey) || !userKey.equals(clientB3Key)) {
-            LOGGER.log(Level.WARN, "B3 key not match, ignored update article [name={0}, email={1}, host={2}, userSymKey={3}, userClientKey={4}]",
-                    userName, clientAdminEmail, clientHost, user.optString(UserExt.USER_B3_KEY), clientB3Key);
-
-            return;
-        }
-
-        if (UserExt.USER_STATUS_C_VALID != user.optInt(UserExt.USER_STATUS)) {
-            LOGGER.log(Level.WARN, "The user[name={0}, email={1}, host={2}] has been forbidden", userName, clientAdminEmail, clientHost);
-
-            return;
-        }
-
-        final JSONObject originalArticle = requestJSONObject.getJSONObject(Article.ARTICLE);
-
-        final String articleTitle = originalArticle.optString(Article.ARTICLE_TITLE);
-        String articleTags = Tag.formatTags(originalArticle.optString(Article.ARTICLE_TAGS));
-        String articleContent = originalArticle.optString(Article.ARTICLE_CONTENT);
-
-        final String permalink = originalArticle.optString(Article.ARTICLE_PERMALINK);
-//        articleContent += "\n\n<p class='fn-clear'><span class='fn-right'><span class='ft-small'>该文章同步自</span> "
-//                + "<i style='margin-right:5px;'><a target='_blank' href='"
-//                + clientHost + permalink + "'>" + clientTitle + "</a></i></span></p>";
-
-        final String authorId = user.optString(Keys.OBJECT_ID);
-        final String clientArticleId = originalArticle.optString(Keys.OBJECT_ID);
-        final JSONObject oldArticle = articleQueryService.getArticleByClientArticleId(authorId, clientArticleId);
-        if (null == oldArticle) {
-            LOGGER.log(Level.WARN, "Not found article [clientHost={0}, clientArticleId={1}] to update", clientHost, clientArticleId);
-
-            return;
-        }
-
-        final JSONObject article = new JSONObject();
-        article.put(Keys.OBJECT_ID, oldArticle.optString(Keys.OBJECT_ID));
-        article.put(Article.ARTICLE_TITLE, articleTitle);
-        article.put(Article.ARTICLE_CONTENT, articleContent);
-        article.put(Article.ARTICLE_EDITOR_TYPE, 0);
-        article.put(Article.ARTICLE_SYNC_TO_CLIENT, false);
-        article.put(Article.ARTICLE_CLIENT_ARTICLE_ID, clientArticleId);
-        article.put(Article.ARTICLE_AUTHOR_ID, authorId);
-        article.put(Article.ARTICLE_AUTHOR_EMAIL, clientAdminEmail.toLowerCase().trim());
-        article.put(Article.ARTICLE_T_IS_BROADCAST, false);
-        article.put(Article.ARTICLE_CLIENT_ARTICLE_PERMALINK, clientHost + permalink);
-
-        if (!Role.ADMIN_ROLE.equals(user.optString(User.USER_ROLE))) {
-            articleTags = articleMgmtService.filterReservedTags(articleTags);
-        }
-
-        try {
-            articleTags = "B3log," + articleTags;
-            articleTags = Tag.formatTags(articleTags);
-            article.put(Article.ARTICLE_TAGS, articleTags);
-
-            articleMgmtService.updateArticle(article);
-
-            context.renderTrueResult();
-        } catch (final ServiceException e) {
-            final String msg = langPropsService.get("updateFailLabel") + " - " + e.getMessage();
-            LOGGER.log(Level.ERROR, msg, e);
-
-            context.renderMsg(msg);
-        }
-
-        // Updates client record
-        JSONObject client = clientQueryService.getClientByAdminEmail(clientAdminEmail);
-        if (null == client) {
-            client = new JSONObject();
-            client.put(Client.CLIENT_ADMIN_EMAIL, clientAdminEmail);
-            client.put(Client.CLIENT_HOST, clientHost);
-            client.put(Client.CLIENT_NAME, clientName);
-            client.put(Client.CLIENT_RUNTIME_ENV, clientRuntimeEnv);
-            client.put(Client.CLIENT_VERSION, clientVersion);
-            client.put(Client.CLIENT_LATEST_ADD_COMMENT_TIME, 0L);
-            client.put(Client.CLIENT_LATEST_ADD_ARTICLE_TIME, System.currentTimeMillis());
-
-            clientMgmtService.addClient(client);
-        } else {
-            client.put(Client.CLIENT_ADMIN_EMAIL, clientAdminEmail);
-            client.put(Client.CLIENT_HOST, clientHost);
-            client.put(Client.CLIENT_NAME, clientName);
-            client.put(Client.CLIENT_RUNTIME_ENV, clientRuntimeEnv);
-            client.put(Client.CLIENT_VERSION, clientVersion);
-            client.put(Client.CLIENT_LATEST_ADD_ARTICLE_TIME, System.currentTimeMillis());
-
-            clientMgmtService.updateClient(client);
+            context.renderJSONValue(Keys.STATUS_CODE, StatusCodes.ERR);
         }
     }
 
     /**
      * Markdowns.
-     *
      * <p>
      * Renders the response with a json object, for example,
      * <pre>
@@ -1443,9 +1192,9 @@ public class ArticleProcessor {
      * </pre>
      * </p>
      *
-     * @param request the specified http servlet request
+     * @param request  the specified http servlet request
      * @param response the specified http servlet response
-     * @param context the specified http request context
+     * @param context  the specified http request context
      * @throws Exception exception
      */
     @RequestProcessing(value = "/markdown", method = HTTPRequestMethod.POST)
@@ -1461,30 +1210,20 @@ public class ArticleProcessor {
             return;
         }
 
-        final JSONObject currentUser = userQueryService.getCurrentUser(request);
-        if (null == currentUser) {
-            response.sendError(HttpServletResponse.SC_FORBIDDEN);
-
-            return;
-        }
-
-        final Set<String> userNames = userQueryService.getUserNames(markdownText);
-        for (final String userName : userNames) {
-            markdownText = markdownText.replace('@' + userName, "@<a href='" + Latkes.getServePath()
-                    + "/member/" + userName + "'>" + userName + "</a>");
-        }
         markdownText = shortLinkQueryService.linkArticle(markdownText);
         markdownText = shortLinkQueryService.linkTag(markdownText);
+        markdownText = Emotions.toAliases(markdownText);
         markdownText = Emotions.convert(markdownText);
         markdownText = Markdowns.toHTML(markdownText);
         markdownText = Markdowns.clean(markdownText, "");
+        markdownText = MP3Players.render(markdownText);
+        markdownText = VideoPlayers.render(markdownText);
 
         context.renderJSONValue("html", markdownText);
     }
 
     /**
      * Gets article preview content.
-     *
      * <p>
      * Renders the response with a json object, for example,
      * <pre>
@@ -1494,9 +1233,9 @@ public class ArticleProcessor {
      * </pre>
      * </p>
      *
-     * @param request the specified http servlet request
-     * @param response the specified http servlet response
-     * @param context the specified http request context
+     * @param request   the specified http servlet request
+     * @param response  the specified http servlet response
+     * @param context   the specified http request context
      * @param articleId the specified article id
      * @throws Exception exception
      */
@@ -1504,7 +1243,7 @@ public class ArticleProcessor {
     @Before(adviceClass = StopwatchStartAdvice.class)
     @After(adviceClass = StopwatchEndAdvice.class)
     public void getArticlePreviewContent(final HttpServletRequest request, final HttpServletResponse response,
-            final HTTPRequestContext context, final String articleId) throws Exception {
+                                         final HTTPRequestContext context, final String articleId) throws Exception {
         final String content = articleQueryService.getArticlePreviewContent(articleId, request);
         if (StringUtils.isBlank(content)) {
             context.renderJSON().renderFalseResult();
@@ -1518,9 +1257,9 @@ public class ArticleProcessor {
     /**
      * Article rewards.
      *
-     * @param request the specified http servlet request
+     * @param request  the specified http servlet request
      * @param response the specified http servlet response
-     * @param context the specified http request context
+     * @param context  the specified http request context
      * @throws Exception exception
      */
     @RequestProcessing(value = "/article/reward", method = HTTPRequestMethod.POST)
@@ -1555,20 +1294,28 @@ public class ArticleProcessor {
         final JSONObject article = articleQueryService.getArticle(articleId);
         articleQueryService.processArticleContent(article, request);
 
+        String markdownText = article.optString(Article.ARTICLE_REWARD_CONTENT);
+        markdownText = shortLinkQueryService.linkArticle(markdownText);
+        markdownText = shortLinkQueryService.linkTag(markdownText);
+        markdownText = Emotions.toAliases(markdownText);
+        markdownText = Emotions.convert(markdownText);
+        markdownText = Markdowns.toHTML(markdownText);
+        markdownText = Markdowns.clean(markdownText, "");
+
         context.renderTrueResult().
-                renderJSONValue(Article.ARTICLE_REWARD_CONTENT, article.optString(Article.ARTICLE_REWARD_CONTENT));
+                renderJSONValue(Article.ARTICLE_REWARD_CONTENT, markdownText);
     }
 
     /**
      * Article thanks.
      *
-     * @param request the specified http servlet request
+     * @param request  the specified http servlet request
      * @param response the specified http servlet response
-     * @param context the specified http request context
+     * @param context  the specified http request context
      * @throws Exception exception
      */
     @RequestProcessing(value = "/article/thank", method = HTTPRequestMethod.POST)
-    @Before(adviceClass = StopwatchStartAdvice.class)
+    @Before(adviceClass = {StopwatchStartAdvice.class, PermissionCheck.class})
     @After(adviceClass = StopwatchEndAdvice.class)
     public void thank(final HttpServletRequest request, final HttpServletResponse response, final HTTPRequestContext context)
             throws Exception {
@@ -1602,13 +1349,13 @@ public class ArticleProcessor {
     /**
      * Sticks an article.
      *
-     * @param request the specified HTTP servlet request
+     * @param request  the specified HTTP servlet request
      * @param response the specified HTTP servlet response
-     * @param context the specified HTTP request context
+     * @param context  the specified HTTP request context
      * @throws Exception exception
      */
     @RequestProcessing(value = "/article/stick", method = HTTPRequestMethod.POST)
-    @Before(adviceClass = StopwatchStartAdvice.class)
+    @Before(adviceClass = {StopwatchStartAdvice.class, PermissionCheck.class})
     @After(adviceClass = StopwatchEndAdvice.class)
     public void stickArticle(final HttpServletRequest request, final HttpServletResponse response, final HTTPRequestContext context)
             throws Exception {
@@ -1655,9 +1402,9 @@ public class ArticleProcessor {
     /**
      * Expires a sticked article.
      *
-     * @param request the specified HTTP servlet request
+     * @param request  the specified HTTP servlet request
      * @param response the specified HTTP servlet response
-     * @param context the specified HTTP request context
+     * @param context  the specified HTTP request context
      * @throws Exception exception
      */
     @RequestProcessing(value = "/cron/article/stick-expire", method = HTTPRequestMethod.GET)

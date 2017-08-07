@@ -7,7 +7,7 @@
         <@head title="${city} - ${symphonyLabel}">
         <meta name="description" content="${symDescriptionLabel}"/>
         </@head>
-        <link type="text/css" rel="stylesheet" href="${staticServePath}/css/index.css?${staticResourceVersion}" />
+        <link rel="stylesheet" href="${staticServePath}/css/index.css?${staticResourceVersion}" />
     </head>
     <body>
         <#include "header.ftl">
@@ -25,7 +25,7 @@
                         <#if "" == current && articles?size gt 0>
                         <div class="fn-clear">
                             <@list listData=articles/>
-                            <@pagination url="/city/${city?url('utf-8')}"/>
+                            <@pagination url="${servePath}/city/${city?url('utf-8')}"/>
                         </div>
                         <#else>
                         <div class="no-list">
@@ -89,10 +89,9 @@
                                 </#list>
                             </ul>
                         </div>
-                        <@pagination url="/city/${city?url('utf-8')}/users"/>
+                        <@pagination url="${servePath}/city/${city?url('utf-8')}/users"/>
                         </#if>
                     </div>
-                    <#include "common/domains.ftl">
                 </div>
 
                 <div class="side">
@@ -100,6 +99,7 @@
                 </div>
             </div>
         </div>
+        <#include "common/domains.ftl">
         <#include "footer.ftl">
         <@listScript/>
     </body>

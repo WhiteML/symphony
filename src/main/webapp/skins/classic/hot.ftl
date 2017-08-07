@@ -1,3 +1,4 @@
+<#-- TODO: RM -->
 <#include "macro-head.ftl">
 <#include "macro-list.ftl">
 <#include "macro-pagination.ftl">
@@ -7,7 +8,7 @@
         <@head title="${hotLabel} - ${symphonyLabel}">
         <meta name="description" content="${recentArticleLabel}"/>
         </@head>
-        <link type="text/css" rel="stylesheet" href="${staticServePath}/css/index.css?${staticResourceVersion}" />
+        <link rel="stylesheet" href="${staticServePath}/css/index.css?${staticResourceVersion}" />
         <link rel="canonical" href="${servePath}/hot">
     </head>
     <body>
@@ -17,18 +18,19 @@
                 <div class="content fn-clear">
                     <div class="module">
                         <@list listData=indexArticles/>
-                        <@pagination url="/hot"/>
+                        <@pagination url="${servePath}/hot"/>
                         <div class="pagination">
                             <a href="${servePath}/recent" class="ft-gray">${moreRecentArticleLabel}</a>
                         </div>
                     </div>
-                    <#include "common/domains.ftl">
+
                 </div>
                 <div class="side">
                     <#include "side.ftl">
                 </div>
             </div>
         </div>
+        <#include "common/domains.ftl">
         <#include "footer.ftl">
         <@listScript/>
     </body>

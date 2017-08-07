@@ -1,6 +1,6 @@
 /*
  * Symphony - A modern community (forum/SNS/blog) platform written in Java.
- * Copyright (C) 2012-2016,  b3log.org & hacpai.com
+ * Copyright (C) 2012-2017,  b3log.org & hacpai.com
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,60 +17,45 @@
  */
 package org.b3log.symphony.event;
 
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import javax.inject.Inject;
-import javax.inject.Named;
-import javax.inject.Singleton;
 import org.apache.commons.lang.StringUtils;
 import org.b3log.latke.Keys;
 import org.b3log.latke.Latkes;
 import org.b3log.latke.event.AbstractEventListener;
 import org.b3log.latke.event.Event;
 import org.b3log.latke.event.EventException;
+import org.b3log.latke.ioc.inject.Inject;
+import org.b3log.latke.ioc.inject.Named;
+import org.b3log.latke.ioc.inject.Singleton;
 import org.b3log.latke.logging.Level;
 import org.b3log.latke.logging.Logger;
 import org.b3log.latke.model.Pagination;
 import org.b3log.latke.model.User;
-import org.b3log.latke.repository.CompositeFilterOperator;
-import org.b3log.latke.repository.FilterOperator;
-import org.b3log.latke.repository.PropertyFilter;
-import org.b3log.latke.repository.Query;
-import org.b3log.latke.repository.SortDirection;
+import org.b3log.latke.repository.*;
 import org.b3log.latke.service.LangPropsService;
-import org.b3log.latke.service.ServiceException;
-import org.b3log.symphony.model.Article;
-import org.b3log.symphony.model.Comment;
-import org.b3log.symphony.model.Common;
-import org.b3log.symphony.model.Notification;
-import org.b3log.symphony.model.Pointtransfer;
-import org.b3log.symphony.model.UserExt;
+import org.b3log.symphony.model.*;
 import org.b3log.symphony.processor.advice.validate.UserRegisterValidation;
 import org.b3log.symphony.processor.channel.ArticleChannel;
 import org.b3log.symphony.processor.channel.ArticleListChannel;
 import org.b3log.symphony.repository.CommentRepository;
 import org.b3log.symphony.repository.UserRepository;
-import org.b3log.symphony.service.ArticleQueryService;
-import org.b3log.symphony.service.AvatarQueryService;
-import org.b3log.symphony.service.CommentQueryService;
-import org.b3log.symphony.service.NotificationMgmtService;
-import org.b3log.symphony.service.PointtransferMgmtService;
-import org.b3log.symphony.service.ShortLinkQueryService;
-import org.b3log.symphony.service.TimelineMgmtService;
-import org.b3log.symphony.service.UserQueryService;
+import org.b3log.symphony.service.*;
 import org.b3log.symphony.util.Emotions;
+import org.b3log.symphony.util.JSONs;
 import org.b3log.symphony.util.Markdowns;
 import org.b3log.symphony.util.Symphonys;
 import org.json.JSONObject;
 import org.jsoup.Jsoup;
 import org.jsoup.safety.Whitelist;
 
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
 /**
  * Sends a comment notification.
  *
  * @author <a href="http://88250.b3log.org">Liang Ding</a>
- * @version 1.6.9.19, Sep 30, 2016
+ * @version 1.7.10.23, May 6, 2017
  * @since 0.2.0
  */
 @Named
@@ -80,13 +65,19 @@ public class CommentNotifier extends AbstractEventListener<JSONObject> {
     /**
      * Logger.
      */
-    private static final Logger LOGGER = Logger.getLogger(CommentNotifier.class.getName());
+    private static final Logger LOGGER = Logger.getLogger(CommentNotifier.class);
 
     /**
      * Comment repository.
      */
     @Inject
     private CommentRepository commentRepository;
+
+    /**
+     * User repository.
+     */
+    @Inject
+    private UserRepository userRepository;
 
     /**
      * Notification management service.
@@ -143,16 +134,15 @@ public class CommentNotifier extends AbstractEventListener<JSONObject> {
     private CommentQueryService commentQueryService;
 
     /**
-     * User repository.
+     * Follow query service.
      */
     @Inject
-    private UserRepository userRepository;
+    private FollowQueryService followQueryService;
 
     @Override
     public void action(final Event<JSONObject> event) throws EventException {
         final JSONObject data = event.getData();
-        LOGGER.log(Level.TRACE, "Processing an event[type={0}, data={1}] in listener[className={2}]",
-                new Object[]{event.getType(), data, CommentNotifier.class.getName()});
+        LOGGER.log(Level.TRACE, "Processing an event [type={0}, data={1}]", event.getType(), data);
 
         try {
             final JSONObject originalArticle = data.getJSONObject(Article.ARTICLE);
@@ -170,7 +160,9 @@ public class CommentNotifier extends AbstractEventListener<JSONObject> {
             final String commenterName = commenter.optString(User.USER_NAME);
 
             // 0. Data channel (WebSocket)
-            final JSONObject chData = new JSONObject();
+            final JSONObject chData = JSONs.clone(originalComment);
+            chData.put(Comment.COMMENT_T_COMMENTER, commenter);
+            chData.put(Keys.OBJECT_ID, commentId);
             chData.put(Article.ARTICLE_T_ID, articleId);
             chData.put(Comment.COMMENT_T_ID, commentId);
             chData.put(Comment.COMMENT_ORIGINAL_COMMENT_ID, originalCmtId);
@@ -225,10 +217,7 @@ public class CommentNotifier extends AbstractEventListener<JSONObject> {
             }
 
             chData.put(Common.THUMBNAIL_UPDATE_TIME, commenter.optLong(UserExt.USER_UPDATE_TIME));
-
             chData.put(Common.TIME_AGO, langPropsService.get("justNowLabel"));
-            chData.put("thankLabel", langPropsService.get("thankLabel"));
-            chData.put("thankedLabel", langPropsService.get("thankedLabel"));
             String thankTemplate = langPropsService.get("thankConfirmLabel");
             thankTemplate = thankTemplate.replace("{point}", String.valueOf(Symphonys.getInt("pointThankComment")))
                     .replace("{user}", commenterName);
@@ -238,18 +227,7 @@ public class CommentNotifier extends AbstractEventListener<JSONObject> {
             cc = Emotions.convert(cc);
             cc = Markdowns.toHTML(cc);
             cc = Markdowns.clean(cc, "");
-            try {
-                final Set<String> userNames = userQueryService.getUserNames(commentContent);
-                for (final String userName : userNames) {
-                    cc = cc.replace('@' + userName, "@<a href='" + Latkes.getServePath()
-                            + "/member/" + userName + "'>" + userName + "</a>");
-                }
-            } catch (final ServiceException e) {
-                LOGGER.log(Level.ERROR, "Generates @username home URL for comment content failed", e);
-            }
 
-            cc = cc.replace("@participants ",
-                    "@<a href='https://hacpai.com/article/1458053458339' class='ft-red'>participants</a> ");
             if (fromClient) {
                 // "<i class='ft-small'>by 88250</i>"
                 String syncCommenterName = StringUtils.substringAfter(cc, "<i class=\"ft-small\">by ");
@@ -267,7 +245,6 @@ public class CommentNotifier extends AbstractEventListener<JSONObject> {
             chData.put(Comment.COMMENT_CONTENT, cc);
             chData.put(Comment.COMMENT_UA, originalComment.optString(Comment.COMMENT_UA));
             chData.put(Common.FROM_CLIENT, fromClient);
-            chData.put(UserExt.USER_UA_STATUS, commenter.optInt(UserExt.USER_UA_STATUS));
 
             ArticleChannel.notifyComment(chData);
 
@@ -349,21 +326,35 @@ public class CommentNotifier extends AbstractEventListener<JSONObject> {
                 }
 
                 final int sum = count * Pointtransfer.TRANSFER_SUM_C_AT_PARTICIPANTS;
-                pointtransferMgmtService.transfer(commenterId, Pointtransfer.ID_C_SYS,
-                        Pointtransfer.TRANSFER_TYPE_C_AT_PARTICIPANTS, sum, commentId, System.currentTimeMillis());
+                if (sum > 0) {
+                    pointtransferMgmtService.transfer(commenterId, Pointtransfer.ID_C_SYS,
+                            Pointtransfer.TRANSFER_TYPE_C_AT_PARTICIPANTS, sum, commentId, System.currentTimeMillis());
+                }
 
                 return;
             }
 
             final Set<String> atUserNames = userQueryService.getUserNames(commentContent);
+            atUserNames.remove(commenterName);
 
-            // 2. 'Commented' Notification
-            if (commenterIsArticleAuthor && atUserNames.isEmpty() && StringUtils.isBlank(originalCmtId)) {
+            final Set<String> watcherIds = new HashSet<>();
+            final JSONObject followerUsersResult =
+                    followQueryService.getArticleWatchers(UserExt.USER_AVATAR_VIEW_MODE_C_ORIGINAL,
+                            articleId, 1, Integer.MAX_VALUE);
+
+            final List<JSONObject> watcherUsers = (List<JSONObject>) followerUsersResult.opt(Keys.RESULTS);
+            for (final JSONObject watcherUser : watcherUsers) {
+                final String watcherUserId = watcherUser.optString(Keys.OBJECT_ID);
+
+                watcherIds.add(watcherUserId);
+            }
+            watcherIds.remove(articleAuthorId);
+
+            if (commenterIsArticleAuthor && atUserNames.isEmpty() && watcherIds.isEmpty() && StringUtils.isBlank(originalCmtId)) {
                 return;
             }
 
-            atUserNames.remove(commenterName); // Do not notify commenter itself
-
+            // 2. 'Commented' Notification
             if (!commenterIsArticleAuthor) {
                 final JSONObject requestJSONObject = new JSONObject();
                 requestJSONObject.put(Notification.NOTIFICATION_USER_ID, articleAuthorId);
@@ -390,6 +381,7 @@ public class CommentNotifier extends AbstractEventListener<JSONObject> {
             final Set<String> articleContentAtUserNames = userQueryService.getUserNames(articleContent);
 
             // 4. 'At' Notification
+            final Set<String> atIds = new HashSet<>();
             for (final String userName : atUserNames) {
                 if (isDiscussion && !articleContentAtUserNames.contains(userName)) {
                     continue;
@@ -417,6 +409,25 @@ public class CommentNotifier extends AbstractEventListener<JSONObject> {
                 requestJSONObject.put(Notification.NOTIFICATION_DATA_ID, commentId);
 
                 notificationMgmtService.addAtNotification(requestJSONObject);
+
+                atIds.add(userId);
+            }
+
+            // 5. 'following - article comment' Notification
+            for (final String userId : watcherIds) {
+                final JSONObject watcher = userRepository.get(userId);
+                final String watcherName = watcher.optString(User.USER_NAME);
+
+                if ((isDiscussion && !articleContentAtUserNames.contains(watcherName)) || commenterName.equals(watcherName)
+                        || repliedIds.contains(userId) || atIds.contains(userId)) {
+                    continue;
+                }
+
+                final JSONObject requestJSONObject = new JSONObject();
+                requestJSONObject.put(Notification.NOTIFICATION_USER_ID, userId);
+                requestJSONObject.put(Notification.NOTIFICATION_DATA_ID, commentId);
+
+                notificationMgmtService.addFollowingArticleCommentNotification(requestJSONObject);
             }
         } catch (final Exception e) {
             LOGGER.log(Level.ERROR, "Sends the comment notification failed", e);

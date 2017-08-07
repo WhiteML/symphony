@@ -1,6 +1,6 @@
 /*
  * Symphony - A modern community (forum/SNS/blog) platform written in Java.
- * Copyright (C) 2012-2016,  b3log.org & hacpai.com
+ * Copyright (C) 2012-2017,  b3log.org & hacpai.com
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,70 +17,42 @@
  */
 package org.b3log.symphony.service;
 
-import java.io.UnsupportedEncodingException;
-import java.net.URLEncoder;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Set;
-import javax.inject.Inject;
 import org.apache.commons.lang.ArrayUtils;
 import org.apache.commons.lang.StringUtils;
 import org.b3log.latke.Keys;
 import org.b3log.latke.event.Event;
 import org.b3log.latke.event.EventException;
 import org.b3log.latke.event.EventManager;
+import org.b3log.latke.ioc.inject.Inject;
 import org.b3log.latke.logging.Level;
 import org.b3log.latke.logging.Logger;
-import org.b3log.latke.model.Role;
 import org.b3log.latke.model.User;
-import org.b3log.latke.repository.FilterOperator;
-import org.b3log.latke.repository.PropertyFilter;
-import org.b3log.latke.repository.Query;
-import org.b3log.latke.repository.RepositoryException;
-import org.b3log.latke.repository.Transaction;
+import org.b3log.latke.repository.*;
 import org.b3log.latke.repository.annotation.Transactional;
+import org.b3log.latke.repository.jdbc.JdbcRepository;
 import org.b3log.latke.service.LangPropsService;
 import org.b3log.latke.service.ServiceException;
 import org.b3log.latke.service.annotation.Service;
 import org.b3log.latke.util.Ids;
 import org.b3log.symphony.event.EventTypes;
-import org.b3log.symphony.model.Article;
-import org.b3log.symphony.model.Comment;
-import org.b3log.symphony.model.Common;
-import org.b3log.symphony.model.Follow;
-import org.b3log.symphony.model.Liveness;
-import org.b3log.symphony.model.Notification;
-import org.b3log.symphony.model.Option;
-import org.b3log.symphony.model.Pointtransfer;
-import org.b3log.symphony.model.Revision;
-import org.b3log.symphony.model.Reward;
-import org.b3log.symphony.model.Tag;
-import org.b3log.symphony.model.UserExt;
-import org.b3log.symphony.repository.ArticleRepository;
-import org.b3log.symphony.repository.CommentRepository;
-import org.b3log.symphony.repository.NotificationRepository;
-import org.b3log.symphony.repository.OptionRepository;
-import org.b3log.symphony.repository.RevisionRepository;
-import org.b3log.symphony.repository.TagArticleRepository;
-import org.b3log.symphony.repository.TagRepository;
-import org.b3log.symphony.repository.UserRepository;
-import org.b3log.symphony.repository.UserTagRepository;
-import org.b3log.symphony.util.Emotions;
-import org.b3log.symphony.util.Pangu;
-import org.b3log.symphony.util.Symphonys;
+import org.b3log.symphony.model.*;
+import org.b3log.symphony.repository.*;
+import org.b3log.symphony.util.*;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.jsoup.Jsoup;
 
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
+import java.util.*;
+
 /**
  * Article management service.
  *
  * @author <a href="http://88250.b3log.org">Liang Ding</a>
- * @version 2.14.26.29, Nov 3, 2016
+ * @author <a href="http://zephyr.b3log.org">Zephyr</a>
+ * @version 2.17.35.44, Aug 4, 2017
  * @since 0.2.0
  */
 @Service
@@ -89,7 +61,12 @@ public class ArticleMgmtService {
     /**
      * Logger.
      */
-    private static final Logger LOGGER = Logger.getLogger(ArticleMgmtService.class.getName());
+    private static final Logger LOGGER = Logger.getLogger(ArticleMgmtService.class);
+
+    /**
+     * Tag max count.
+     */
+    private static final int TAG_MAX_CNT = 4;
 
     /**
      * Comment repository.
@@ -192,7 +169,6 @@ public class ArticleMgmtService {
      */
     @Inject
     private TagQueryService tagQueryService;
-
     /**
      * Notification management service.
      */
@@ -212,22 +188,164 @@ public class ArticleMgmtService {
     private SearchMgmtService searchMgmtService;
 
     /**
-     * Tag max count.
+     * Audio management service.
      */
-    private static final int TAG_MAX_CNT = 4;
+    @Inject
+    private AudioMgmtService audioMgmtService;
 
     /**
-     * Removes an article specified with the given article id.
+     * Determines whether the specified tag title exists in the specified tags.
+     *
+     * @param tagTitle the specified tag title
+     * @param tags     the specified tags
+     * @return {@code true} if it exists, {@code false} otherwise
+     * @throws JSONException json exception
+     */
+    private static boolean tagExists(final String tagTitle, final List<JSONObject> tags) throws JSONException {
+        for (final JSONObject tag : tags) {
+            if (tag.getString(Tag.TAG_TITLE).equals(tagTitle)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Removes an article specified with the given article id. An article is removable if:
+     * <ul>
+     * <li>No comments</li>
+     * <li>No watches, collects, ups, downs</li>
+     * <li>No rewards</li>
+     * <li>No thanks</li>
+     * </ul>
+     * Sees https://github.com/b3log/symphony/issues/450 for more details.
+     *
+     * @param articleId the given article id
+     * @throws ServiceException service exception
+     */
+    public void removeArticle(final String articleId) throws ServiceException {
+        JSONObject article = null;
+
+        try {
+            article = articleRepository.get(articleId);
+        } catch (final Exception e) {
+            LOGGER.log(Level.ERROR, "Gets article [id=" + articleId + "] failed", e);
+        }
+
+        if (null == article) {
+            return;
+        }
+
+        final int commentCnt = article.optInt(Article.ARTICLE_COMMENT_CNT);
+        if (commentCnt > 0) {
+            throw new ServiceException(langPropsService.get("removeArticleFoundCmtLabel"));
+        }
+
+        final int watchCnt = article.optInt(Article.ARTICLE_WATCH_CNT);
+        final int collectCnt = article.optInt(Article.ARTICLE_COLLECT_CNT);
+        final int ups = article.optInt(Article.ARTICLE_GOOD_CNT);
+        final int downs = article.optInt(Article.ARTICLE_BAD_CNT);
+        if (watchCnt > 0 || collectCnt > 0 || ups > 0 || downs > 0) {
+            throw new ServiceException("removeArticleFoundWatchEtcLabel");
+        }
+
+        final int rewardCnt = (int) rewardQueryService.rewardedCount(articleId, Reward.TYPE_C_ARTICLE);
+        if (rewardCnt > 0) {
+            throw new ServiceException("removeArticleFoundRewardLabel");
+        }
+
+        final int thankCnt = (int) rewardQueryService.rewardedCount(articleId, Reward.TYPE_C_THANK_ARTICLE);
+        if (thankCnt > 0) {
+            throw new ServiceException("removeArticleFoundThankLabel");
+        }
+
+        // Perform removal
+        removeArticleByAdmin(articleId);
+    }
+
+    /**
+     * Generates article's audio.
+     *
+     * @param article the specified article
+     * @param userId  the specified user id
+     */
+    public void genArticleAudio(final JSONObject article, final String userId) {
+        if (Article.ARTICLE_TYPE_C_THOUGHT == article.optInt(Article.ARTICLE_TYPE)
+                || Article.ARTICLE_TYPE_C_DISCUSSION == article.optInt(Article.ARTICLE_TYPE)
+                || Article.ARTICLE_TYPE_C_BOOK == article.optInt(Article.ARTICLE_TYPE)) {
+            return;
+        }
+
+        final String tags = article.optString(Article.ARTICLE_TAGS);
+        if (StringUtils.containsIgnoreCase(tags, Tag.TAG_TITLE_C_SANDBOX)) {
+            return;
+        }
+
+        final String articleId = article.optString(Keys.OBJECT_ID);
+        String previewContent = article.optString(Article.ARTICLE_CONTENT);
+        previewContent = Markdowns.toHTML(previewContent);
+        previewContent = Emotions.clear(Jsoup.parse(previewContent).text());
+        previewContent = StringUtils.substring(previewContent, 0, 512);
+        final String contentToTTS = previewContent;
+
+        new Thread(() -> {
+            final Transaction transaction = articleRepository.beginTransaction();
+
+            String audioURL = "";
+            if (StringUtils.length(contentToTTS) < 96 || Runes.getChinesePercent(contentToTTS) < 40) {
+                LOGGER.trace("Content is too short to TTS [contentToTTS=" + contentToTTS + "]");
+            } else {
+                audioURL = audioMgmtService.tts(contentToTTS, Article.ARTICLE, articleId, userId);
+            }
+
+            article.put(Article.ARTICLE_AUDIO_URL, audioURL);
+
+            try {
+                final JSONObject toUpdate = articleRepository.get(articleId);
+                toUpdate.put(Article.ARTICLE_AUDIO_URL, audioURL);
+
+                articleRepository.update(articleId, toUpdate);
+                transaction.commit();
+
+                if (StringUtils.isNotBlank(audioURL)) {
+                    LOGGER.debug("Generated article [id=" + articleId + "] audio");
+                }
+            } catch (final Exception e) {
+                if (transaction.isActive()) {
+                    transaction.rollback();
+                }
+
+                LOGGER.log(Level.ERROR, "Updates article's audio URL failed", e);
+            }
+
+            JdbcRepository.dispose();
+        }).start();
+    }
+
+    /**
+     * Removes an article specified with the given article id. Calls this method will remove all existed data related
+     * with the specified article forcibly.
      *
      * @param articleId the given article id
      */
     @Transactional
-    public void removeArticle(final String articleId) {
+    public void removeArticleByAdmin(final String articleId) {
         try {
             final JSONObject article = articleRepository.get(articleId);
-
             if (null == article) {
                 return;
+            }
+
+            Query query = new Query().setFilter(new PropertyFilter(
+                    Comment.COMMENT_ON_ARTICLE_ID, FilterOperator.EQUAL, articleId)).setPageCount(1);
+            final JSONArray comments = commentRepository.get(query).optJSONArray(Keys.RESULTS);
+            final int commentCnt = comments.length();
+            for (int i = 0; i < commentCnt; i++) {
+                final JSONObject comment = comments.optJSONObject(i);
+                final String commentId = comment.optString(Keys.OBJECT_ID);
+
+                commentRepository.removeComment(commentId);
             }
 
             final String authorId = article.optString(Article.ARTICLE_AUTHOR_ID);
@@ -239,8 +357,7 @@ public class ArticleMgmtService {
             final String cityStatId = city + "-ArticleCount";
             final JSONObject cityArticleCntOption = optionRepository.get(cityStatId);
             if (null != cityArticleCntOption) {
-                cityArticleCntOption.put(Option.OPTION_VALUE,
-                        cityArticleCntOption.optInt(Option.OPTION_VALUE) - 1);
+                cityArticleCntOption.put(Option.OPTION_VALUE, cityArticleCntOption.optInt(Option.OPTION_VALUE) - 1);
                 optionRepository.update(cityStatId, cityArticleCntOption);
             }
 
@@ -249,6 +366,17 @@ public class ArticleMgmtService {
             optionRepository.update(Option.ID_C_STATISTIC_ARTICLE_COUNT, articleCntOption);
 
             articleRepository.remove(articleId);
+
+            // Remove article revisions
+            query = new Query().setFilter(CompositeFilterOperator.and(
+                    new PropertyFilter(Revision.REVISION_DATA_ID, FilterOperator.EQUAL, articleId),
+                    new PropertyFilter(Revision.REVISION_DATA_TYPE, FilterOperator.EQUAL, Revision.DATA_TYPE_C_ARTICLE)
+            ));
+            final JSONArray articleRevisions = revisionRepository.get(query).optJSONArray(Keys.RESULTS);
+            for (int i = 0; i < articleRevisions.length(); i++) {
+                final JSONObject articleRevision = articleRevisions.optJSONObject(i);
+                revisionRepository.remove(articleRevision.optString(Keys.OBJECT_ID));
+            }
 
             final List<JSONObject> tagArticleRels = tagArticleRepository.getByArticleId(articleId);
             for (final JSONObject tagArticleRel : tagArticleRels) {
@@ -263,30 +391,7 @@ public class ArticleMgmtService {
             }
 
             tagArticleRepository.removeByArticleId(articleId);
-
             notificationRepository.removeByDataId(articleId);
-
-            final Query query = new Query().setFilter(new PropertyFilter(
-                    Comment.COMMENT_ON_ARTICLE_ID, FilterOperator.EQUAL, articleId)).setPageCount(1);
-            final JSONArray comments = commentRepository.get(query).optJSONArray(Keys.RESULTS);
-            final int commentCnt = comments.length();
-            for (int i = 0; i < commentCnt; i++) {
-                final JSONObject comment = comments.optJSONObject(i);
-                final String commentId = comment.optString(Keys.OBJECT_ID);
-
-                final String commentAuthorId = comment.optString(Comment.COMMENT_AUTHOR_ID);
-                final JSONObject commenter = userRepository.get(commentAuthorId);
-                commenter.put(UserExt.USER_COMMENT_COUNT, commenter.optInt(UserExt.USER_COMMENT_COUNT) - 1);
-                userRepository.update(commentAuthorId, commenter);
-
-                commentRepository.remove(commentId);
-
-                notificationRepository.removeByDataId(commentId);
-            }
-
-            final JSONObject commentCntOption = optionRepository.get(Option.ID_C_STATISTIC_CMT_COUNT);
-            commentCntOption.put(Option.OPTION_VALUE, commentCntOption.optInt(Option.OPTION_VALUE) - commentCnt);
-            optionRepository.update(Option.ID_C_STATISTIC_CMT_COUNT, commentCntOption);
 
             if (Symphonys.getBoolean("algolia.enabled")) {
                 searchMgmtService.removeAlgoliaDocument(article);
@@ -319,7 +424,6 @@ public class ArticleMgmtService {
 
                     final int viewCnt = article.optInt(Article.ARTICLE_VIEW_CNT);
                     article.put(Article.ARTICLE_VIEW_CNT, viewCnt + 1);
-
                     article.put(Article.ARTICLE_RANDOM_DOUBLE, Math.random());
 
                     articleRepository.update(articleId, article);
@@ -339,28 +443,25 @@ public class ArticleMgmtService {
     /**
      * Adds an article with the specified request json object.
      *
-     * @param requestJSONObject the specified request json object, for example,      <pre>
-     * {
-     *     "articleTitle": "",
-     *     "articleTags": "",
-     *     "articleContent": "",
-     *     "articleEditorType": "",
-     *     "articleAuthorEmail": "",
-     *     "articleAuthorId": "",
-     *     "articleCommentable": boolean, // optional, default to true
-     *     "syncWithSymphonyClient": boolean, // optional
-     *     "clientArticleId": "", // optional
-     *     "clientArticlePermalink": "", // optional
-     *     "isBroadcast": boolean, // Client broadcast, optional
-     *     "articleType": int, // optional, default to 0
-     *     "articleRewardContent": "", // optional, default to ""
-     *     "articleRewardPoint": int, // optional, default to 0
-     *     "articleIP": "", // optional, default to ""
-     *     "articleUA": "", // optional, default to ""
-     *     "articleAnonymous": int // optional, default to 0 (public)
-     * }
-     * </pre>, see {@link Article} for more details
-     *
+     * @param requestJSONObject the specified request json object, for example,
+     *                          "articleTitle": "",
+     *                          "articleTags": "",
+     *                          "articleContent": "",
+     *                          "articleEditorType": "",
+     *                          "articleAuthorId": "",
+     *                          "articleCommentable": boolean, // optional, default to true
+     *                          "syncWithSymphonyClient": boolean, // optional
+     *                          "clientArticleId": "", // optional
+     *                          "clientArticlePermalink": "", // optional
+     *                          "isBroadcast": boolean, // Client broadcast, optional
+     *                          "articleType": int, // optional, default to 0
+     *                          "articleRewardContent": "", // optional, default to ""
+     *                          "articleRewardPoint": int, // optional, default to 0
+     *                          "articleIP": "", // optional, default to ""
+     *                          "articleUA": "", // optional, default to ""
+     *                          "articleAnonymous": int, // optional, default to 0 (public)
+     *                          "articleAnonymousView": int // optional, default to 0 (use global)
+     *                          , see {@link Article} for more details
      * @return generated article id
      * @throws ServiceException service exception
      */
@@ -377,8 +478,14 @@ public class ArticleMgmtService {
 
         final int articleAnonymous = requestJSONObject.optInt(Article.ARTICLE_ANONYMOUS);
 
+        final boolean syncWithSymphonyClient = requestJSONObject.optBoolean(Article.ARTICLE_SYNC_TO_CLIENT);
+
         String articleTitle = requestJSONObject.optString(Article.ARTICLE_TITLE);
+        articleTitle = Emotions.toAliases(articleTitle);
+        articleTitle = Pangu.spacingText(articleTitle);
         articleTitle = StringUtils.trim(articleTitle);
+
+        final int articleType = requestJSONObject.optInt(Article.ARTICLE_TYPE, Article.ARTICLE_TYPE_C_NORMAL);
 
         try {
             // check if admin allow to add article
@@ -391,7 +498,7 @@ public class ArticleMgmtService {
             author = userRepository.get(authorId);
 
             if (currentTimeMillis - author.optLong(UserExt.USER_LATEST_ARTICLE_TIME) < Symphonys.getLong("minStepArticleTime")
-                    && !Role.ADMIN_ROLE.equals(author.optString(User.USER_ROLE))) {
+                    && !Role.ROLE_ID_C_ADMIN.equals(author.optString(User.USER_ROLE))) {
 
                 LOGGER.log(Level.WARN, "Adds article too frequent [userName={0}]", author.optString(User.USER_NAME));
                 throw new ServiceException(langPropsService.get("tooFrequentArticleLabel"));
@@ -412,25 +519,36 @@ public class ArticleMgmtService {
                 // Point
                 final long followerCnt = followQueryService.getFollowerCount(authorId, Follow.FOLLOWING_TYPE_C_USER);
                 final int addition = (int) Math.round(Math.sqrt(followerCnt));
+                final int broadcast = Article.ARTICLE_TYPE_C_CITY_BROADCAST == articleType ?
+                        Pointtransfer.TRANSFER_SUM_C_ADD_ARTICLE_BROADCAST : 0;
 
-                final int sum = Pointtransfer.TRANSFER_SUM_C_ADD_ARTICLE + addition + rewardPoint;
+                final int sum = Pointtransfer.TRANSFER_SUM_C_ADD_ARTICLE + addition + rewardPoint + broadcast;
 
                 if (balance - sum < 0) {
                     throw new ServiceException(langPropsService.get("insufficientBalanceLabel"));
                 }
             }
 
-            final JSONObject maybeExist = articleRepository.getByTitle(articleTitle);
-            if (null != maybeExist) {
-                final String existArticleAuthorId = maybeExist.optString(Article.ARTICLE_AUTHOR_ID);
-                final JSONObject existArticleAuthor = userRepository.get(existArticleAuthorId);
-                final String userName = existArticleAuthor.optString(User.USER_NAME);
-                String msg = langPropsService.get("duplicatedArticleTitleLabel");
-                msg = msg.replace("{user}", "<a target='_blank' href='/member/" + userName + "'>" + userName + "</a>");
-                msg = msg.replace("{article}", "<a target='_blank' href='/article/" + maybeExist.optString(Keys.OBJECT_ID)
-                        + "'>" + articleTitle + "</a>");
+            if (Article.ARTICLE_TYPE_C_DISCUSSION != articleType && Article.ARTICLE_TYPE_C_BOOK != articleType) {
+                final JSONObject maybeExist = articleRepository.getByTitle(articleTitle);
+                if (null != maybeExist) {
+                    final String existArticleAuthorId = maybeExist.optString(Article.ARTICLE_AUTHOR_ID);
+                    String msg;
+                    if (existArticleAuthorId.equals(authorId)) {
+                        msg = langPropsService.get("duplicatedArticleTitleSelfLabel");
+                        msg = msg.replace("{article}", "<a target='_blank' href='/article/" + maybeExist.optString(Keys.OBJECT_ID)
+                                + "'>" + articleTitle + "</a>");
+                    } else {
+                        final JSONObject existArticleAuthor = userRepository.get(existArticleAuthorId);
+                        final String userName = existArticleAuthor.optString(User.USER_NAME);
+                        msg = langPropsService.get("duplicatedArticleTitleLabel");
+                        msg = msg.replace("{user}", "<a target='_blank' href='/member/" + userName + "'>" + userName + "</a>");
+                        msg = msg.replace("{article}", "<a target='_blank' href='/article/" + maybeExist.optString(Keys.OBJECT_ID)
+                                + "'>" + articleTitle + "</a>");
+                    }
 
-                throw new ServiceException(msg);
+                    throw new ServiceException(msg);
+                }
             }
         } catch (final RepositoryException e) {
             throw new ServiceException(e);
@@ -447,15 +565,12 @@ public class ArticleMgmtService {
             final String clientArticlePermalink = requestJSONObject.optString(Article.ARTICLE_CLIENT_ARTICLE_PERMALINK);
             final boolean isBroadcast = requestJSONObject.optBoolean(Article.ARTICLE_T_IS_BROADCAST);
 
-            articleTitle = Emotions.toAliases(articleTitle);
-            articleTitle = Pangu.spacingText(articleTitle);
-
             article.put(Article.ARTICLE_TITLE, articleTitle);
             article.put(Article.ARTICLE_TAGS, requestJSONObject.optString(Article.ARTICLE_TAGS));
 
             String articleContent = requestJSONObject.optString(Article.ARTICLE_CONTENT);
             articleContent = Emotions.toAliases(articleContent);
-            articleContent = StringUtils.trim(articleContent);
+            //articleContent = StringUtils.trim(articleContent) + " "; https://github.com/b3log/symphony/issues/389
             articleContent = StringUtils.replace(articleContent, langPropsService.get("uploadingLabel", Locale.SIMPLIFIED_CHINESE), "");
             articleContent = StringUtils.replace(articleContent, langPropsService.get("uploadingLabel", Locale.US), "");
             article.put(Article.ARTICLE_CONTENT, articleContent);
@@ -463,7 +578,6 @@ public class ArticleMgmtService {
             article.put(Article.ARTICLE_REWARD_CONTENT, requestJSONObject.optString(Article.ARTICLE_REWARD_CONTENT));
 
             article.put(Article.ARTICLE_EDITOR_TYPE, requestJSONObject.optString(Article.ARTICLE_EDITOR_TYPE));
-            article.put(Article.ARTICLE_AUTHOR_EMAIL, requestJSONObject.optString(Article.ARTICLE_AUTHOR_EMAIL));
             article.put(Article.ARTICLE_SYNC_TO_CLIENT, fromClient ? true : author.optBoolean(UserExt.SYNC_TO_CLIENT));
             article.put(Article.ARTICLE_AUTHOR_ID, authorId);
             article.put(Article.ARTICLE_COMMENT_CNT, 0);
@@ -471,6 +585,7 @@ public class ArticleMgmtService {
             article.put(Article.ARTICLE_GOOD_CNT, 0);
             article.put(Article.ARTICLE_BAD_CNT, 0);
             article.put(Article.ARTICLE_COLLECT_CNT, 0);
+            article.put(Article.ARTICLE_WATCH_CNT, 0);
             article.put(Article.ARTICLE_COMMENTABLE, requestJSONObject.optBoolean(Article.ARTICLE_COMMENTABLE, true));
             article.put(Article.ARTICLE_CREATE_TIME, currentTimeMillis);
             article.put(Article.ARTICLE_UPDATE_TIME, currentTimeMillis);
@@ -486,7 +601,6 @@ public class ArticleMgmtService {
             article.put(Article.ARTICLE_RANDOM_DOUBLE, Math.random());
             article.put(Article.REDDIT_SCORE, 0);
             article.put(Article.ARTICLE_STATUS, Article.ARTICLE_STATUS_C_VALID);
-            final int articleType = requestJSONObject.optInt(Article.ARTICLE_TYPE, Article.ARTICLE_TYPE_C_NORMAL);
             article.put(Article.ARTICLE_TYPE, articleType);
             article.put(Article.ARTICLE_REWARD_POINT, rewardPoint);
             String city = "";
@@ -495,14 +609,17 @@ public class ArticleMgmtService {
             }
             article.put(Article.ARTICLE_CITY, city);
             article.put(Article.ARTICLE_ANONYMOUS, articleAnonymous);
+            article.put(Article.ARTICLE_SYNC_TO_CLIENT, syncWithSymphonyClient);
             article.put(Article.ARTICLE_PERFECT, Article.ARTICLE_PERFECT_C_NOT_PERFECT);
-            article.put(Article.ARTICLE_ANONYMOUS_VIEW, Article.ARTICLE_ANONYMOUS_VIEW_C_USE_GLOBAL);
+            article.put(Article.ARTICLE_ANONYMOUS_VIEW,
+                    requestJSONObject.optInt(Article.ARTICLE_ANONYMOUS_VIEW, Article.ARTICLE_ANONYMOUS_VIEW_C_USE_GLOBAL));
+            article.put(Article.ARTICLE_AUDIO_URL, "");
 
             String articleTags = article.optString(Article.ARTICLE_TAGS);
             articleTags = Tag.formatTags(articleTags);
             boolean sandboxEnv = false;
-            if (StringUtils.containsIgnoreCase(articleTags, "Sandbox")) {
-                articleTags = "Sandbox";
+            if (StringUtils.containsIgnoreCase(articleTags, Tag.TAG_TITLE_C_SANDBOX)) {
+                articleTags = Tag.TAG_TITLE_C_SANDBOX;
                 sandboxEnv = true;
             }
 
@@ -577,9 +694,11 @@ public class ArticleMgmtService {
                 // Revision
                 final JSONObject revision = new JSONObject();
                 revision.put(Revision.REVISION_AUTHOR_ID, authorId);
+
                 final JSONObject revisionData = new JSONObject();
                 revisionData.put(Article.ARTICLE_TITLE, articleTitle);
                 revisionData.put(Article.ARTICLE_CONTENT, articleContent);
+
                 revision.put(Revision.REVISION_DATA, revisionData.toString());
                 revision.put(Revision.REVISION_DATA_ID, articleId);
                 revision.put(Revision.REVISION_DATA_TYPE, Revision.DATA_TYPE_C_ARTICLE);
@@ -646,23 +765,20 @@ public class ArticleMgmtService {
     /**
      * Updates an article with the specified request json object.
      *
-     * @param requestJSONObject the specified request json object, for example,      <pre>
-     * {
-     *     "oId": "",
-     *     "articleTitle": "",
-     *     "articleTags": "",
-     *     "articleContent": "",
-     *     "articleEditorType": "",
-     *     "articleCommentable": boolean, // optional, default to true
-     *     "clientArticlePermalink": "", // optional
-     *     "articleType": int // optional, default to 0
-     *     "articleRewardContent": "", // optional, default to ""
-     *     "articleRewardPoint": int, // optional, default to 0
-     *     "articleIP": "", // optional, default to ""
-     *     "articleUA": "", // optional default to ""
-     * }
-     * </pre>, see {@link Article} for more details
-     *
+     * @param requestJSONObject the specified request json object, for example,
+     *                          "oId": "",
+     *                          "articleTitle": "",
+     *                          "articleTags": "",
+     *                          "articleContent": "",
+     *                          "articleEditorType": "",
+     *                          "articleCommentable": boolean, // optional, default to true
+     *                          "clientArticlePermalink": "", // optional
+     *                          "articleType": int // optional, default to 0
+     *                          "articleRewardContent": "", // optional, default to ""
+     *                          "articleRewardPoint": int, // optional, default to 0
+     *                          "articleIP": "", // optional, default to ""
+     *                          "articleUA": "", // optional default to ""
+     *                          , see {@link Article} for more details
      * @throws ServiceException service exception
      */
     public synchronized void updateArticle(final JSONObject requestJSONObject) throws ServiceException {
@@ -692,7 +808,8 @@ public class ArticleMgmtService {
             final long followerCnt = followQueryService.getFollowerCount(authorId, Follow.FOLLOWING_TYPE_C_USER);
             int addition = (int) Math.round(Math.sqrt(followerCnt));
             final long collectCnt = followQueryService.getFollowerCount(articleId, Follow.FOLLOWING_TYPE_C_ARTICLE);
-            addition += collectCnt * 2;
+            final long watchCnt = followQueryService.getFollowerCount(articleId, Follow.FOLLOWING_TYPE_C_ARTICLE_WATCH);
+            addition += (collectCnt + watchCnt) * 2;
             updatePointSum = Pointtransfer.TRANSFER_SUM_C_UPDATE_ARTICLE + addition;
 
             articleAnonymous = oldArticle.optInt(Article.ARTICLE_ANONYMOUS);
@@ -707,15 +824,21 @@ public class ArticleMgmtService {
 
             final JSONObject maybeExist = articleRepository.getByTitle(articleTitle);
             if (null != maybeExist) {
-                final String existArticleAuthorId = maybeExist.optString(Article.ARTICLE_AUTHOR_ID);
-
-                if (!existArticleAuthorId.equals(requestJSONObject.optString(Article.ARTICLE_AUTHOR_ID))) {
-                    final JSONObject existArticleAuthor = userRepository.get(existArticleAuthorId);
-                    final String userName = existArticleAuthor.optString(User.USER_NAME);
-                    String msg = langPropsService.get("duplicatedArticleTitleLabel");
-                    msg = msg.replace("{user}", "<a target='_blank' href='/member/" + userName + "'>" + userName + "</a>");
-                    msg = msg.replace("{article}", "<a target='_blank' href='/article/" + maybeExist.optString(Keys.OBJECT_ID)
-                            + "'>" + articleTitle + "</a>");
+                if (!oldArticle.optString(Article.ARTICLE_TITLE).equals(articleTitle)) {
+                    final String existArticleAuthorId = maybeExist.optString(Article.ARTICLE_AUTHOR_ID);
+                    String msg;
+                    if (existArticleAuthorId.equals(authorId)) {
+                        msg = langPropsService.get("duplicatedArticleTitleSelfLabel");
+                        msg = msg.replace("{article}", "<a target='_blank' href='/article/" + maybeExist.optString(Keys.OBJECT_ID)
+                                + "'>" + articleTitle + "</a>");
+                    } else {
+                        final JSONObject existArticleAuthor = userRepository.get(existArticleAuthorId);
+                        final String userName = existArticleAuthor.optString(User.USER_NAME);
+                        msg = langPropsService.get("duplicatedArticleTitleLabel");
+                        msg = msg.replace("{user}", "<a target='_blank' href='/member/" + userName + "'>" + userName + "</a>");
+                        msg = msg.replace("{article}", "<a target='_blank' href='/article/" + maybeExist.optString(Keys.OBJECT_ID)
+                                + "'>" + articleTitle + "</a>");
+                    }
 
                     throw new ServiceException(msg);
                 }
@@ -736,6 +859,7 @@ public class ArticleMgmtService {
             articleTitle = Emotions.toAliases(articleTitle);
             articleTitle = Pangu.spacingText(articleTitle);
 
+            final String oldTitle = oldArticle.optString(Article.ARTICLE_TITLE);
             oldArticle.put(Article.ARTICLE_TITLE, articleTitle);
 
             oldArticle.put(Article.ARTICLE_TAGS, requestJSONObject.optString(Article.ARTICLE_TAGS));
@@ -744,8 +868,11 @@ public class ArticleMgmtService {
 
             String articleContent = requestJSONObject.optString(Article.ARTICLE_CONTENT);
             articleContent = Emotions.toAliases(articleContent);
+            //articleContent = StringUtils.trim(articleContent) + " "; https://github.com/b3log/symphony/issues/389
             articleContent = articleContent.replace(langPropsService.get("uploadingLabel", Locale.SIMPLIFIED_CHINESE), "");
             articleContent = articleContent.replace(langPropsService.get("uploadingLabel", Locale.US), "");
+
+            final String oldContent = oldArticle.optString(Article.ARTICLE_CONTENT);
             oldArticle.put(Article.ARTICLE_CONTENT, articleContent);
 
             final long currentTimeMillis = System.currentTimeMillis();
@@ -777,13 +904,16 @@ public class ArticleMgmtService {
 
             articleRepository.update(articleId, oldArticle);
 
-            if (Article.ARTICLE_TYPE_C_THOUGHT != articleType) {
+            if (Article.ARTICLE_TYPE_C_THOUGHT != articleType
+                    && (!oldContent.equals(articleContent) || !oldTitle.equals(articleTitle))) {
                 // Revision
                 final JSONObject revision = new JSONObject();
                 revision.put(Revision.REVISION_AUTHOR_ID, authorId);
+
                 final JSONObject revisionData = new JSONObject();
                 revisionData.put(Article.ARTICLE_TITLE, articleTitle);
                 revisionData.put(Article.ARTICLE_CONTENT, articleContent);
+
                 revision.put(Revision.REVISION_DATA, revisionData.toString());
                 revision.put(Revision.REVISION_DATA_ID, articleId);
                 revision.put(Revision.REVISION_DATA_TYPE, Revision.DATA_TYPE_C_ARTICLE);
@@ -833,13 +963,12 @@ public class ArticleMgmtService {
 
     /**
      * Updates the specified article by the given article id.
-     *
      * <p>
      * <b>Note</b>: This method just for admin console.
      * </p>
      *
      * @param articleId the given article id
-     * @param article the specified article
+     * @param article   the specified article
      * @throws ServiceException service exception
      */
     public void updateArticleByAdmin(final String articleId, final JSONObject article) throws ServiceException {
@@ -886,10 +1015,33 @@ public class ArticleMgmtService {
                 }
             }
 
-            userRepository.update(author.optString(Keys.OBJECT_ID), author);
+            userRepository.update(authorId, author);
             articleRepository.update(articleId, article);
 
             transaction.commit();
+
+            if (Article.ARTICLE_PERFECT_C_NOT_PERFECT == oldArticle.optInt(Article.ARTICLE_PERFECT)
+                    && Article.ARTICLE_PERFECT_C_PERFECT == perfect) {
+                final JSONObject notification = new JSONObject();
+                notification.put(Notification.NOTIFICATION_USER_ID, authorId);
+                notification.put(Notification.NOTIFICATION_DATA_ID, articleId);
+
+                notificationMgmtService.addPerfectArticleNotification(notification);
+
+                pointtransferMgmtService.transfer(Pointtransfer.ID_C_SYS, authorId,
+                        Pointtransfer.TRANSFER_TYPE_C_PERFECT_ARTICLE, Pointtransfer.TRANSFER_SUM_C_PERFECT_ARTICLE,
+                        articleId, System.currentTimeMillis());
+            }
+
+            if (Article.ARTICLE_STATUS_C_VALID != article.optInt(Article.ARTICLE_STATUS)) {
+                if (Symphonys.getBoolean("algolia.enabled")) {
+                    searchMgmtService.removeAlgoliaDocument(article);
+                }
+
+                if (Symphonys.getBoolean("es.enabled")) {
+                    searchMgmtService.removeESDocument(article, Article.ARTICLE);
+                }
+            }
         } catch (final Exception e) {
             if (transaction.isActive()) {
                 transaction.rollback();
@@ -904,7 +1056,7 @@ public class ArticleMgmtService {
      * A user specified by the given sender id rewards the author of an article specified by the given article id.
      *
      * @param articleId the given article id
-     * @param senderId the given sender id
+     * @param senderId  the given sender id
      * @throws ServiceException service exception
      */
     public void reward(final String articleId, final String senderId) throws ServiceException {
@@ -987,7 +1139,7 @@ public class ArticleMgmtService {
      * A user specified by the given sender id thanks the author of an article specified by the given article id.
      *
      * @param articleId the given article id
-     * @param senderId the given sender id
+     * @param senderId  the given sender id
      * @throws ServiceException service exception
      */
     public void thank(final String articleId, final String senderId) throws ServiceException {
@@ -1211,27 +1363,28 @@ public class ArticleMgmtService {
 
     /**
      * Processes tags for article update.
-     *
+     * <p>
      * <ul>
      * <li>Un-tags old article, decrements tag reference count</li>
      * <li>Removes old article-tag relations</li>
      * <li>Saves new article-tag relations with tag reference count</li>
      * </ul>
+     * </p>
      *
      * @param oldArticle the specified old article
      * @param newArticle the specified new article
-     * @param author the specified author
+     * @param author     the specified author
      * @throws Exception exception
      */
     private synchronized void processTagsForArticleUpdate(final JSONObject oldArticle, final JSONObject newArticle,
-            final JSONObject author) throws Exception {
+                                                          final JSONObject author) throws Exception {
         final String oldArticleId = oldArticle.getString(Keys.OBJECT_ID);
         final List<JSONObject> oldTags = tagRepository.getByArticleId(oldArticleId);
         String tagsString = newArticle.getString(Article.ARTICLE_TAGS);
         tagsString = Tag.formatTags(tagsString);
         boolean sandboxEnv = false;
-        if (StringUtils.containsIgnoreCase(tagsString, "Sandbox")) {
-            tagsString = "Sandbox";
+        if (StringUtils.containsIgnoreCase(tagsString, Tag.TAG_TITLE_C_SANDBOX)) {
+            tagsString = Tag.TAG_TITLE_C_SANDBOX;
             sandboxEnv = true;
         }
 
@@ -1316,6 +1469,7 @@ public class ArticleMgmtService {
 
         if (0 != tagIdsDropped.length) {
             removeTagArticleRelations(oldArticleId, tagIdsDropped);
+            removeUserTagRelations(oldArticle.optString(Article.ARTICLE_AUTHOR_ID), Tag.TAG_TYPE_C_ARTICLE, tagIdsDropped);
         }
 
         tagStrings = new String[tagsNeedToAdd.size()];
@@ -1332,14 +1486,13 @@ public class ArticleMgmtService {
 
     /**
      * Removes tag-article relations by the specified article id and tag ids of the relations to be removed.
-     *
      * <p>
      * Removes all relations if not specified the tag ids.
      * </p>
      *
      * @param articleId the specified article id
-     * @param tagIds the specified tag ids of the relations to be removed
-     * @throws JSONException json exception
+     * @param tagIds    the specified tag ids of the relations to be removed
+     * @throws JSONException       json exception
      * @throws RepositoryException repository exception
      */
     private void removeTagArticleRelations(final String articleId, final String... tagIds)
@@ -1362,29 +1515,25 @@ public class ArticleMgmtService {
     }
 
     /**
-     * Determines whether the specified tag title exists in the specified tags.
+     * Removes User-Tag relations by the specified user id, type and tag ids of the relations to be removed.
      *
-     * @param tagTitle the specified tag title
-     * @param tags the specified tags
-     * @return {@code true} if it exists, {@code false} otherwise
-     * @throws JSONException json exception
+     * @param userId the specified article id
+     * @param type   the specified type
+     * @param tagIds the specified tag ids of the relations to be removed
+     * @throws RepositoryException repository exception
      */
-    private static boolean tagExists(final String tagTitle, final List<JSONObject> tags) throws JSONException {
-        for (final JSONObject tag : tags) {
-            if (tag.getString(Tag.TAG_TITLE).equals(tagTitle)) {
-                return true;
-            }
+    private void removeUserTagRelations(final String userId, final int type, final String... tagIds) throws RepositoryException {
+        for (final String tagId : tagIds) {
+            userTagRepository.removeByUserIdAndTagId(userId, tagId, type);
         }
-
-        return false;
     }
 
     /**
      * Tags the specified article with the specified tag titles.
      *
      * @param tagTitles the specified (new) tag titles
-     * @param article the specified article
-     * @param author the specified author
+     * @param article   the specified article
+     * @param author    the specified author
      * @throws RepositoryException repository exception
      */
     private synchronized void tag(final String[] tagTitles, final JSONObject article, final JSONObject author)
@@ -1398,8 +1547,8 @@ public class ArticleMgmtService {
             int userTagType;
             final int articleCmtCnt = article.optInt(Article.ARTICLE_COMMENT_CNT);
             if (null == tag) {
-                LOGGER.log(Level.TRACE, "Found a new tag[title={0}] in article[title={1}]",
-                        new Object[]{tagTitle, article.optString(Article.ARTICLE_TITLE)});
+                LOGGER.log(Level.TRACE, "Found a new tag [title={0}] in article [title={1}]",
+                        tagTitle, article.optString(Article.ARTICLE_TITLE));
                 tag = new JSONObject();
                 tag.put(Tag.TAG_TITLE, tagTitle);
                 String tagURI = tagTitle;
@@ -1437,8 +1586,7 @@ public class ArticleMgmtService {
             } else {
                 tagId = tag.optString(Keys.OBJECT_ID);
                 LOGGER.log(Level.TRACE, "Found a existing tag[title={0}, id={1}] in article[title={2}]",
-                        new Object[]{tag.optString(Tag.TAG_TITLE), tag.optString(Keys.OBJECT_ID),
-                            article.optString(Article.ARTICLE_TITLE)});
+                        tag.optString(Tag.TAG_TITLE), tag.optString(Keys.OBJECT_ID), article.optString(Article.ARTICLE_TITLE));
                 final JSONObject tagTmp = new JSONObject();
                 tagTmp.put(Keys.OBJECT_ID, tagId);
                 final String title = tag.optString(Tag.TAG_TITLE);
@@ -1464,6 +1612,7 @@ public class ArticleMgmtService {
 
                 userTagType = Tag.TAG_TYPE_C_ARTICLE;
             }
+
             // Tag-Article relation
             final JSONObject tagArticleRelation = new JSONObject();
             tagArticleRelation.put(Tag.TAG + "_" + Keys.OBJECT_ID, tagId);
@@ -1472,15 +1621,21 @@ public class ArticleMgmtService {
             tagArticleRelation.put(Article.ARTICLE_COMMENT_CNT, article.optInt(Article.ARTICLE_COMMENT_CNT));
             tagArticleRelation.put(Article.REDDIT_SCORE, article.optDouble(Article.REDDIT_SCORE, 0D));
             tagArticleRelation.put(Article.ARTICLE_PERFECT, article.optInt(Article.ARTICLE_PERFECT));
-
             tagArticleRepository.add(tagArticleRelation);
+
+            final String authorId = article.optString(Article.ARTICLE_AUTHOR_ID);
+
             // User-Tag relation
+            if (Tag.TAG_TYPE_C_ARTICLE == userTagType) {
+                userTagRepository.removeByUserIdAndTagId(authorId, tagId, Tag.TAG_TYPE_C_ARTICLE);
+            }
+
             final JSONObject userTagRelation = new JSONObject();
             userTagRelation.put(Tag.TAG + '_' + Keys.OBJECT_ID, tagId);
             if (Article.ARTICLE_ANONYMOUS_C_ANONYMOUS == article.optInt(Article.ARTICLE_ANONYMOUS)) {
                 userTagRelation.put(User.USER + '_' + Keys.OBJECT_ID, "0");
             } else {
-                userTagRelation.put(User.USER + '_' + Keys.OBJECT_ID, article.optString(Article.ARTICLE_AUTHOR_ID));
+                userTagRelation.put(User.USER + '_' + Keys.OBJECT_ID, authorId);
             }
             userTagRelation.put(Common.TYPE, userTagType);
             userTagRepository.add(userTagRelation);
@@ -1525,23 +1680,19 @@ public class ArticleMgmtService {
 
     /**
      * Adds an article with the specified request json object.
-     *
      * <p>
      * <b>Note</b>: This method just for admin console.
      * </p>
      *
-     * @param requestJSONObject the specified request json object, for example,      <pre>
-     * {
-     *     "articleTitle": "",
-     *     "articleTags": "",
-     *     "articleContent": "",
-     *     "articleRewardContent": "",
-     *     "articleRewardPoint": int,
-     *     "userName": "",
-     *     "time": long
-     * }
-     * </pre>, see {@link Article} for more details
-     *
+     * @param requestJSONObject the specified request json object, for example,
+     *                          "articleTitle": "",
+     *                          "articleTags": "",
+     *                          "articleContent": "",
+     *                          "articleRewardContent": "",
+     *                          "articleRewardPoint": int,
+     *                          "userName": "",
+     *                          "time": long
+     *                          , see {@link Article} for more details
      * @return generated article id
      * @throws ServiceException service exception
      */
@@ -1569,7 +1720,6 @@ public class ArticleMgmtService {
             article.put(Article.ARTICLE_CLIENT_ARTICLE_ID, ret);
             article.put(Article.ARTICLE_CLIENT_ARTICLE_PERMALINK, "");
             article.put(Article.ARTICLE_AUTHOR_ID, author.optString(Keys.OBJECT_ID));
-            article.put(Article.ARTICLE_AUTHOR_EMAIL, author.optString(User.USER_EMAIL));
             article.put(Article.ARTICLE_TITLE, Emotions.toAliases(requestJSONObject.optString(Article.ARTICLE_TITLE)));
             article.put(Article.ARTICLE_CONTENT, Emotions.toAliases(requestJSONObject.optString(Article.ARTICLE_CONTENT)));
             article.put(Article.ARTICLE_REWARD_CONTENT, requestJSONObject.optString(Article.ARTICLE_REWARD_CONTENT));
@@ -1580,6 +1730,7 @@ public class ArticleMgmtService {
             article.put(Article.ARTICLE_GOOD_CNT, 0);
             article.put(Article.ARTICLE_BAD_CNT, 0);
             article.put(Article.ARTICLE_COLLECT_CNT, 0);
+            article.put(Article.ARTICLE_WATCH_CNT, 0);
             article.put(Article.ARTICLE_COMMENTABLE, true);
             article.put(Article.ARTICLE_CREATE_TIME, time);
             article.put(Article.ARTICLE_UPDATE_TIME, time);
@@ -1595,8 +1746,8 @@ public class ArticleMgmtService {
             String articleTags = requestJSONObject.optString(Article.ARTICLE_TAGS);
             articleTags = Tag.formatTags(articleTags);
             boolean sandboxEnv = false;
-            if (StringUtils.containsIgnoreCase(articleTags, "Sandbox")) {
-                articleTags = "Sandbox";
+            if (StringUtils.containsIgnoreCase(articleTags, Tag.TAG_TITLE_C_SANDBOX)) {
+                articleTags = Tag.TAG_TITLE_C_SANDBOX;
                 sandboxEnv = true;
             }
 
@@ -1636,6 +1787,7 @@ public class ArticleMgmtService {
             article.put(Article.ARTICLE_ANONYMOUS, Article.ARTICLE_ANONYMOUS_C_PUBLIC);
             article.put(Article.ARTICLE_PERFECT, Article.ARTICLE_PERFECT_C_NOT_PERFECT);
             article.put(Article.ARTICLE_ANONYMOUS_VIEW, Article.ARTICLE_ANONYMOUS_VIEW_C_USE_GLOBAL);
+            article.put(Article.ARTICLE_AUDIO_URL, "");
 
             final JSONObject articleCntOption = optionRepository.get(Option.ID_C_STATISTIC_ARTICLE_COUNT);
             final int articleCnt = articleCntOption.optInt(Option.OPTION_VALUE);
